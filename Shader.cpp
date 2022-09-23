@@ -1,0 +1,57 @@
+//
+// Created by admin on 2022/9/20.
+//
+
+#include "Shader.h"
+
+namespace Shader {
+    void basicVertexShader(VertexShaderPayload &payload) {
+        Eigen::Matrix4f mv = payload.viewMatrix * payload.modelMatrix;
+        // model and view transform
+        // model_space -> world_space -> view_space
+        payload.vertex.pos = mv * payload.vertex.pos;
+        payload.viewSpacePos = {payload.vertex.pos.x(), payload.vertex.pos.y(), payload.vertex.pos.z()};
+
+        // projection transform
+        // view_space -> clip_space
+        payload.vertex.pos = payload.projectionMatrix * payload.vertex.pos;
+    };
+
+    void emptyVertexShader(VertexShaderPayload &payload) {
+    };
+
+    void basicFragmentShader(FragmentShaderPayload &payload) {
+    };
+
+    void textureFragmentShader(FragmentShaderPayload &payload) {
+        payload.color = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y());
+    };
+
+    void blinnPhongFragmentShader(FragmentShaderPayload &payload) {
+        if (payload.lights.empty()) return;
+        Eigen::Vector3f ka = payload.material.ka; //Eigen::Vector3f(0.005, 0.005, 0.005); // Ambient factor
+        Eigen::Vector3f ks = payload.material.ks; //Eigen::Vector3f(0.7937, 0.7937, 0.7937); // Specular factor, or called Shininess
+        Eigen::Vector3f kd = payload.material.kd;
+        if (!payload.material.diffuseTexture.isEmpty())
+            kd = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y()) / 255.f; // Diffuse factor
+        float ns = payload.material.ns; // Specular range exponent
+
+        Eigen::Vector3f ambientIntensity(10, 10, 10);
+
+        Eigen::Vector3f La = Eigen::Vector3f::Zero(), Ld = Eigen::Vector3f::Zero(), Ls = Eigen::Vector3f::Zero();
+        for (auto &light: payload.lights) {
+            // For each light source in the code, calculate the ambient, diffuse and specular and accumulate them
+            Eigen::Vector3f l = light.pos - payload.viewSpacePos;
+            Eigen::Vector3f v = -payload.viewSpacePos;
+            Eigen::Vector3f h = l.normalized() + v.normalized();
+            float r2 = l.squaredNorm();
+            float cos_nl = payload.normal.dot(l) / (payload.normal.norm() * l.norm());
+            float cos_nh = payload.normal.dot(h) / (payload.normal.norm() * h.norm());
+
+            La += ka.cwiseProduct(ambientIntensity);
+            Ld += kd.cwiseProduct(light.intensity / r2) * MAX(0, cos_nl);
+            Ls += ks.cwiseProduct(light.intensity / r2) * pow(MAX(0, cos_nh), ns);
+        }
+        payload.color = (La + Ld + Ls) * 255.f;
+    };
+}
