@@ -40,6 +40,8 @@ public:
                                   std::array<Eigen::Vector3f, 3> &vertexesViewSpacePos);
 
     void rasterizeTriangleLine(const RasterizerPayload &payload);
+
+    void drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, const RasterizerPayload &payload);
 };
 
 
