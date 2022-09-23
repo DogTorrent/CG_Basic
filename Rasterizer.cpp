@@ -11,7 +11,7 @@ Rasterizer::Rasterizer(ScreenBuffer &screenBuffer, Primitive::Material &material
 
 void Rasterizer::rasterizeTriangle(const RasterizerPayload &payload) {
 
-    // Find out the AABB bounding box of current triangle but ignore pixels out of screen range
+    // Find out the AABB bounding box of current triangle
     int left = floor(payload.triangleVertexes[0]->pos.x()), right = left;
     int bottom = floor(payload.triangleVertexes[0]->pos.y()), top = bottom;
     for (int i = 1; i < 3; ++i) {
