@@ -11,33 +11,81 @@ Rasterizer::Rasterizer(ScreenBuffer &screenBuffer, Primitive::Material &material
 
 void Rasterizer::rasterizeTriangle(const RasterizerPayload &payload) {
 
-    // Find out the AABB bounding box of current triangle
-    int left = floor(payload.triangleVertexes[0]->pos.x()), right = left;
-    int bottom = floor(payload.triangleVertexes[0]->pos.y()), top = bottom;
-    for (int i = 1; i < 3; ++i) {
-        auto &vPos = payload.triangleVertexes[i]->pos;
-        if ((int) floor(vPos.x()) < left) {
-            left = floor(vPos.x());
-        }
-        else if ((int) floor(vPos.x()) > right) {
-            right = floor(vPos.x());
-        }
-        if ((int) floor(vPos.y()) < bottom) {
-            bottom = floor(vPos.y());
-        }
-        else if ((int) floor(vPos.y()) > top) {
-            top = floor(vPos.y());
-        }
+//    // Find out the AABB bounding box of current triangle
+//    int left = floor(payload.triangleVertexes[0]->pos.x()), right = left;
+//    int bottom = floor(payload.triangleVertexes[0]->pos.y()), top = bottom;
+//    for (int i = 1; i < 3; ++i) {
+//        auto &vPos = payload.triangleVertexes[i]->pos;
+//        if ((int) floor(vPos.x()) < left) {
+//            left = floor(vPos.x());
+//        } else if ((int) floor(vPos.x()) > right) {
+//            right = floor(vPos.x());
+//        }
+//        if ((int) floor(vPos.y()) < bottom) {
+//            bottom = floor(vPos.y());
+//        } else if ((int) floor(vPos.y()) > top) {
+//            top = floor(vPos.y());
+//        }
+//    }
+//
+//    for (int x = left; x <= right; ++x) {
+//        for (int y = bottom; y <= top; ++y) {
+//            Eigen::Vector3f pointScreenSpacePos((float) x + 0.5f, (float) y + 0.5f, 0);
+//            if (!checkInsideTriangle(pointScreenSpacePos.x(), pointScreenSpacePos.y(),
+//                                     payload.triangleVertexes))
+//                continue;
+//
+//            drawScreenSpacePoint(pointScreenSpacePos, payload);
+//        }
+//    }
+
+    std::sort(payload.triangleVertexes.begin(), payload.triangleVertexes.end(),
+              [](Primitive::Vertex *a, Primitive::Vertex *b) -> bool {
+                  return a->pos.y() < b->pos.y();
+              });
+    std::vector<Eigen::Vector2f> scanTrianglePos;
+    if (payload.triangleVertexes[0]->pos.y() == payload.triangleVertexes[1]->pos.y()) {
+        scanTrianglePos.reserve(3);
+        // flat bottom
+        scanTrianglePos.emplace_back(payload.triangleVertexes[0]->pos.x(),payload.triangleVertexes[0]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[1]->pos.x(),payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[2]->pos.x(),payload.triangleVertexes[2]->pos.y());
+    } else if (payload.triangleVertexes[1]->pos.y() == payload.triangleVertexes[2]->pos.y()) {
+        scanTrianglePos.reserve(3);
+        // flat top
+        scanTrianglePos.emplace_back(payload.triangleVertexes[1]->pos.x(),payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[2]->pos.x(),payload.triangleVertexes[2]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[0]->pos.x(),payload.triangleVertexes[0]->pos.y());
+    } else {
+        scanTrianglePos.reserve(6);
+        float x = (payload.triangleVertexes[1]->pos.y() - payload.triangleVertexes[0]->pos.y())
+                  / (payload.triangleVertexes[2]->pos.y() - payload.triangleVertexes[0]->pos.y())
+                  * (payload.triangleVertexes[2]->pos.x() - payload.triangleVertexes[0]->pos.x()) +
+                  payload.triangleVertexes[0]->pos.x();
+        // flat bottom
+        scanTrianglePos.emplace_back(payload.triangleVertexes[1]->pos.x(),payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(x, payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[2]->pos.x(),payload.triangleVertexes[2]->pos.y());
+        // flat top
+        scanTrianglePos.emplace_back(payload.triangleVertexes[1]->pos.x(),payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(x, payload.triangleVertexes[1]->pos.y());
+        scanTrianglePos.emplace_back(payload.triangleVertexes[0]->pos.x(),payload.triangleVertexes[0]->pos.y());
     }
-
-    for (int x = left; x <= right; ++x) {
+    for (int i = 0; i < scanTrianglePos.size(); i += 3) {
+        if (scanTrianglePos[i].x() > scanTrianglePos[i + 1].x()) std::swap(scanTrianglePos[i], scanTrianglePos[i + 1]);
+        int bottom = floor(scanTrianglePos[i].y());
+        int top = floor(scanTrianglePos[i + 2].y());
         for (int y = bottom; y <= top; ++y) {
-            Eigen::Vector3f pointScreenSpacePos((float) x + 0.5f, (float) y + 0.5f, 0);
-            if (!checkInsideTriangle(pointScreenSpacePos.x(), pointScreenSpacePos.y(),
-                                     payload.triangleVertexes))
-                continue;
-
-            drawScreenSpacePoint(pointScreenSpacePos, payload);
+            int left = floor(((float) y + 0.5f - scanTrianglePos[i].y())
+                             / (scanTrianglePos[i + 2].y() - scanTrianglePos[i].y())
+                             * (scanTrianglePos[i + 2].x() - scanTrianglePos[i].x()) + scanTrianglePos[i].x());
+            int right = floor(((float) y + 0.5f - scanTrianglePos[i + 1].y())
+                              / (scanTrianglePos[i + 2].y() - scanTrianglePos[i + 1].y())
+                              * (scanTrianglePos[i + 2].x() - scanTrianglePos[i + 1].x()) + scanTrianglePos[i + 1].x());
+            for (int x = left; x <= right; ++x) {
+                Eigen::Vector3f pointScreenSpacePos((float) x + 0.5f, (float) y + 0.5f, 0);
+                drawScreenSpacePoint(pointScreenSpacePos, payload);
+            }
         }
     }
 }
