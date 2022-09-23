@@ -149,35 +149,35 @@ void Rasterizer::rasterizeTriangleLine(const RasterizerPayload &payload) {
                                       + viewSpaceGamma * payload.triangleVertexes[2]->pos.z();
 
             // z test
-            if (pointScreenSpacePos.z() >= screenBuffer.valueInDepthBuffer(pixelX, pixelY) ||
-                pointScreenSpacePos.z() < 0)
-                continue;
+            if (pointScreenSpacePos.z() < screenBuffer.valueInDepthBuffer(pixelX, pixelY) &&
+                pointScreenSpacePos.z() >= 0) {
 
-            // z write
-            screenBuffer.valueInDepthBuffer(pixelX, pixelY) = pointScreenSpacePos.z();
+                // z write
+                screenBuffer.valueInDepthBuffer(pixelX, pixelY) = pointScreenSpacePos.z();
 
-            // interpolate other
-            Eigen::Vector3f color = viewSpaceAlpha * payload.triangleVertexes[0]->color
-                                    + viewSpaceBeta * payload.triangleVertexes[1]->color
-                                    + viewSpaceGamma * payload.triangleVertexes[2]->color;
-            Eigen::Vector3f normal = viewSpaceAlpha * payload.triangleVertexes[0]->normal
-                                     + viewSpaceBeta * payload.triangleVertexes[1]->normal
-                                     + viewSpaceGamma * payload.triangleVertexes[2]->normal;
-            Eigen::Vector2f uv = viewSpaceAlpha * payload.triangleVertexes[0]->uv
-                                 + viewSpaceBeta * payload.triangleVertexes[1]->uv
-                                 + viewSpaceGamma * payload.triangleVertexes[2]->uv;
-            Eigen::Vector3f viewSpacePos = viewSpaceAlpha * payload.vertexesViewSpacePos[0]
-                                           + viewSpaceBeta * payload.vertexesViewSpacePos[1]
-                                           + viewSpaceGamma * payload.vertexesViewSpacePos[2];
+                // interpolate other
+                Eigen::Vector3f color = viewSpaceAlpha * payload.triangleVertexes[0]->color
+                                        + viewSpaceBeta * payload.triangleVertexes[1]->color
+                                        + viewSpaceGamma * payload.triangleVertexes[2]->color;
+                Eigen::Vector3f normal = viewSpaceAlpha * payload.triangleVertexes[0]->normal
+                                         + viewSpaceBeta * payload.triangleVertexes[1]->normal
+                                         + viewSpaceGamma * payload.triangleVertexes[2]->normal;
+                Eigen::Vector2f uv = viewSpaceAlpha * payload.triangleVertexes[0]->uv
+                                     + viewSpaceBeta * payload.triangleVertexes[1]->uv
+                                     + viewSpaceGamma * payload.triangleVertexes[2]->uv;
+                Eigen::Vector3f viewSpacePos = viewSpaceAlpha * payload.vertexesViewSpacePos[0]
+                                               + viewSpaceBeta * payload.vertexesViewSpacePos[1]
+                                               + viewSpaceGamma * payload.vertexesViewSpacePos[2];
 
-            // apply fragment shader
-            Shader::FragmentShaderPayload fragmentShaderPayload{viewSpacePos, color, normal, uv,
-                                                                payload.lightList,
-                                                                material};
-            Shader::basicFragmentShader(fragmentShaderPayload);
-            fragmentShader(fragmentShaderPayload);
+                // apply fragment shader
+                Shader::FragmentShaderPayload fragmentShaderPayload{viewSpacePos, color, normal, uv,
+                                                                    payload.lightList,
+                                                                    material};
+                Shader::basicFragmentShader(fragmentShaderPayload);
+                fragmentShader(fragmentShaderPayload);
 
-            screenBuffer.valueInFrameBuffer(pixelX, pixelY) = fragmentShaderPayload.color;
+                screenBuffer.valueInFrameBuffer(pixelX, pixelY) = fragmentShaderPayload.color;
+            }
 
             p.x() += ddx;
             p.y() += ddy;

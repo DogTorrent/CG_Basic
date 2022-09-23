@@ -23,6 +23,9 @@ namespace Shader {
     void basicFragmentShader(FragmentShaderPayload &payload) {
     };
 
+    void emptyFragmentShader(FragmentShaderPayload &payload) {
+    };
+
     void textureFragmentShader(FragmentShaderPayload &payload) {
         payload.color = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y());
     };
@@ -53,5 +56,5 @@ namespace Shader {
             Ls += ks.cwiseProduct(light.intensity / r2) * pow(MAX(0, cos_nh), ns);
         }
         payload.color = (La + Ld + Ls) * 255.f;
-    };
+    }
 }

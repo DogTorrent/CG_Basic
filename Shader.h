@@ -34,6 +34,8 @@ namespace Shader {
 
     void basicFragmentShader(FragmentShaderPayload &payload);
 
+    void emptyFragmentShader(FragmentShaderPayload &payload);
+
     void textureFragmentShader(FragmentShaderPayload &payload);
 
     void blinnPhongFragmentShader(FragmentShaderPayload &payload);
