@@ -10,7 +10,9 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
     std::deque<Primitive::Geometry> geometryList;
     objl::Loader loader;
     loader.LoadFile(pathToObj);
+    std::cout<<"meshes count = "<<loader.LoadedMeshes.size()<<std::endl;
     for (auto mesh: loader.LoadedMeshes) {
+        std::cout<<" vertices count = "<<mesh.Vertices.size()<<std::endl;
         Primitive::Geometry geometry;
         geometry.material.ka = Eigen::Vector3f(mesh.MeshMaterial.Ka.X, mesh.MeshMaterial.Ka.Y, mesh.MeshMaterial.Ka.Z);
         geometry.material.kd = Eigen::Vector3f(mesh.MeshMaterial.Kd.X, mesh.MeshMaterial.Kd.Y, mesh.MeshMaterial.Kd.Z);
@@ -44,7 +46,7 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
 
 int main() {
     std::deque<Primitive::Geometry> geometryList = loadObj(
-            R"(C:/Users/admin/CLionProjects/CG_Basic/Resources/Models/Spot/spot_triangulated_mod.obj)");
+            R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
     int screenWidth = 700;
     int screenHeight = 700;
     ScreenBuffer screenBuffer(screenWidth, screenHeight);
@@ -52,7 +54,7 @@ int main() {
 
     Eigen::Vector3f scalingRatio(2.5, 2.5, 2.5);
     Eigen::Vector4f rotationAxis(0, 1, 0, 0);
-    float rotationDegree = 0;
+    float rotationDegree = 30;
     Eigen::Vector4f modelPos(0, 0, 0, 1);
     Eigen::Vector4f cameraPos(0, 0, -15, 1);
     Eigen::Vector4f cameraToward(0, 0, 1, 0);
