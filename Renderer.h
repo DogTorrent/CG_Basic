@@ -7,11 +7,10 @@
 
 #include <vector>
 #include <eigen3/Eigen/Eigen>
-#include <opencv2/opencv.hpp>
 #include "Primitive.h"
 #include "Shader.h"
-#include "Rasterizer.h"
-#include "ScreenBuffer.h"
+
+class ScreenBuffer;
 
 struct RendererPayload {
     Primitive::Geometry &geometry;

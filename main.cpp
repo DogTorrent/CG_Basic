@@ -1,8 +1,156 @@
+
+
 #include <iostream>
+#include <thread>
+#include <opencv2/highgui.hpp>
+#include "ThirdParty/cvui.h"
 #include "ThirdParty/OBJ_Loader.h"
 #include "Primitive.h"
 #include "Renderer.h"
-#include "TransformMatrix.h"
+#include "Scene.h"
+#include "ScreenBuffer.h"
+#include "ToolbarComponent.h"
+
+std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
+
+int main() {
+    Scene scene;
+    ScreenBuffer screenBuffer(700, 700);
+    scene.screenBuffer = &screenBuffer;
+    SceneObject sceneObject;
+    scene.pSceneObjectList.push_back(&sceneObject);
+
+    sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
+    sceneObject.scalingRatio = {2.5, 2.5, 2.5};
+    sceneObject.rotationAxis = {0, 1, 0, 0};
+    sceneObject.rotationDegree = 30;
+    sceneObject.modelPos = {0, 0, 0, 1};
+    sceneObject.cameraPos = {0, 0, -15, 1};
+    sceneObject.cameraToward = {0, 0, 1, 0};
+    sceneObject.cameraTop = {0, 1, 0, 0};
+    sceneObject.FoV = 45;
+    sceneObject.aspectRatio = 1;
+    sceneObject.nearPaneZ = 1;
+    sceneObject.farPaneZ = 50;
+    sceneObject.lightList.push_back({{20,  0,   -20},
+                                     {500, 500, 500}});
+    sceneObject.vertexShader = Shader::emptyVertexShader;
+    sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
+
+    std::string windowName = "Software Renderer";
+    cvui::init(windowName);
+    int toolbarWidth = 400;
+    int padding = 10;
+    ToolbarComponent toolbarComponent{toolbarWidth, padding};
+    cv::Mat frame = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height), CV_8UC3);
+
+    bool isRendering = false;
+    while (cv::getWindowProperty(windowName, cv::WINDOW_AUTOSIZE) >= 0) {
+        frame = cv::Scalar(49, 52, 49);
+
+        cvui::beginColumn(frame, screenBuffer.width + padding, 0, toolbarWidth - 2 * padding, -1, padding);
+        {
+            cvui::space(0);
+
+            cvui::text("Object Position");
+            toolbarComponent.f3Row(sceneObject.modelPos.x(),
+                                   sceneObject.modelPos.y(),
+                                   sceneObject.modelPos.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Object Scaling");
+            toolbarComponent.f3Row(sceneObject.scalingRatio.x(),
+                                   sceneObject.scalingRatio.y(),
+                                   sceneObject.scalingRatio.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Object Rotation");
+            toolbarComponent.f3Row(sceneObject.rotationAxis.x(),
+                                   sceneObject.rotationAxis.y(),
+                                   sceneObject.rotationAxis.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            toolbarComponent.f1Row(sceneObject.rotationDegree, "Angle Degree", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Camera Position");
+            toolbarComponent.f3Row(sceneObject.cameraPos.x(),
+                                   sceneObject.cameraPos.y(),
+                                   sceneObject.cameraPos.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Camera Top Axis");
+            toolbarComponent.f3Row(sceneObject.cameraTop.x(),
+                                   sceneObject.cameraTop.y(),
+                                   sceneObject.cameraTop.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Camera Toward Axis");
+            toolbarComponent.f3Row(sceneObject.cameraToward.x(),
+                                   sceneObject.cameraToward.y(),
+                                   sceneObject.cameraToward.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Light 0 Position");
+            toolbarComponent.f3Row(sceneObject.lightList[0].pos.x(),
+                                   sceneObject.lightList[0].pos.y(),
+                                   sceneObject.lightList[0].pos.z(),
+                                   "X:", "Y:", "Z:", !isRendering);
+            cvui::space(0);
+
+            cvui::beginRow(toolbarWidth, -1, padding);
+            {
+                if (cvui::button("Render")) {
+                    if (!isRendering) {
+                        isRendering = true;
+                        std::thread t([&]() -> void {
+                            scene.draw();
+                            isRendering = false;
+                        });
+                        t.detach();
+                    }
+                }
+                if (cvui::button("Clean")) {
+                    if (!isRendering) {
+                        screenBuffer.clearBuffer();
+                    }
+                }
+                if (cvui::button("Reload .obj File")) {
+                    if (!isRendering) {
+                        sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
+                    }
+                }
+                if (cvui::button("Exit")) {
+                    break;
+                }
+            }
+            cvui::endRow();
+            cvui::space(0);
+
+            if (isRendering) {
+                cvui::text("Rendering...");
+            }
+            cvui::space(0);
+        }
+        cvui::endColumn();
+
+        cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
+        image.convertTo(image, CV_8UC3, 1.0f);
+        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+
+        cvui::image(frame, 0, 0, image);
+
+        cvui::imshow(windowName, frame);
+
+        if (cv::waitKey(20) == 27) {
+            break;
+        }
+    }
+}
 
 std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
     size_t pathSplitIndex = pathToObj.find_last_of('/');
@@ -10,9 +158,9 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
     std::deque<Primitive::Geometry> geometryList;
     objl::Loader loader;
     loader.LoadFile(pathToObj);
-    std::cout<<"meshes count = "<<loader.LoadedMeshes.size()<<std::endl;
+    std::cout << "meshes count = " << loader.LoadedMeshes.size() << std::endl;
     for (auto mesh: loader.LoadedMeshes) {
-        std::cout<<" vertices count = "<<mesh.Vertices.size()<<std::endl;
+        std::cout << " vertices count = " << mesh.Vertices.size() << std::endl;
         Primitive::Geometry geometry;
         geometry.material.ka = Eigen::Vector3f(mesh.MeshMaterial.Ka.X, mesh.MeshMaterial.Ka.Y, mesh.MeshMaterial.Ka.Z);
         geometry.material.kd = Eigen::Vector3f(mesh.MeshMaterial.Kd.X, mesh.MeshMaterial.Kd.Y, mesh.MeshMaterial.Kd.Z);
@@ -42,108 +190,4 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
         geometryList.emplace_back(geometry);
     }
     return geometryList;
-}
-
-int main() {
-    std::deque<Primitive::Geometry> geometryList = loadObj(
-            R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
-    int screenWidth = 700;
-    int screenHeight = 700;
-    ScreenBuffer screenBuffer(screenWidth, screenHeight);
-    Renderer renderer(screenBuffer);
-
-    Eigen::Vector3f scalingRatio(2.5, 2.5, 2.5);
-    Eigen::Vector4f rotationAxis(0, 1, 0, 0);
-    float rotationDegree = 30;
-    Eigen::Vector4f modelPos(0, 0, 0, 1);
-    Eigen::Vector4f cameraPos(0, 0, -15, 1);
-    Eigen::Vector4f cameraToward(0, 0, 1, 0);
-    Eigen::Vector4f cameraTop(0, 1, 0, 0);
-    float FoV = 45;
-    float aspectRatio = (float) screenWidth / (float) screenHeight;
-    float nearPaneZ = 1;
-    float farPaneZ = 50;
-    std::deque<Primitive::Light> lightList;
-    lightList.push_back({{25,  10,  5},
-                         {500, 500, 500}});
-    lightList.push_back({{0,   0,   -30},
-                         {500, 500, 500}});
-    std::function<void(Shader::VertexShaderPayload &)> vertexShader = Shader::emptyVertexShader;
-    std::function<void(Shader::FragmentShaderPayload &)> fragmentShader = Shader::blinnPhongFragmentShader;
-
-    int keyboardKey;
-    while (true) {
-        screenBuffer.clearBuffer();
-        renderer.modelMatrix = TransformMatrix::getModelMatrix(TransformMatrix::getScalingMatrix(scalingRatio),
-                                                               TransformMatrix::getRotationMatrix(rotationAxis,
-                                                                                                  rotationDegree),
-                                                               TransformMatrix::getMovingMatrix(modelPos));
-
-        renderer.viewMatrix = TransformMatrix::getViewMatrix(cameraPos, cameraToward, cameraTop);
-
-        renderer.projectionMatrix = TransformMatrix::getProjectionMatrix(FoV, aspectRatio, nearPaneZ, farPaneZ);
-
-        for (auto &geometry: geometryList) {
-            RendererPayload rendererPayload{geometry, vertexShader, fragmentShader, lightList};
-            renderer.renderGeometry(rendererPayload);
-        }
-
-        cv::Mat image(screenWidth, screenHeight, CV_32FC3, screenBuffer.frameBuffer.data());
-        image.convertTo(image, CV_8UC3, 1.0f);
-        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-        cv::imshow("preview", image);
-
-        keyboardKey = cv::waitKeyEx();
-        switch (keyboardKey) {
-            case 'w': {
-                cameraPos.y() += 1;
-                break;
-            }
-            case 'a': {
-                cameraPos.x() -= 1;
-                break;
-            }
-            case 's': {
-                cameraPos.y() -= 1;
-                break;
-            }
-            case 'd': {
-                cameraPos.x() += 1;
-                break;
-            }
-            case 61: { // +
-                cameraPos.z() += 1;
-                break;
-            }
-            case 45: { // -
-                cameraPos.z() -= 1;
-                break;
-            }
-            case 2490368: { // up
-                modelPos.y() += 1;
-                break;
-            }
-            case 2621440: { // down
-                modelPos.y() -= 1;
-                break;
-            }
-            case 2424832: { // left
-                modelPos.x() -= 1;
-                break;
-            }
-            case 2555904: { // right
-                modelPos.x() += 1;
-                break;
-            }
-            case 27:
-            case -1: {
-                return 0;
-            }
-            default: {
-                std::cout << keyboardKey << std::endl;
-                break;
-            }
-        }
-    }
-
 }

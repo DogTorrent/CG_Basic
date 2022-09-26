@@ -9,7 +9,8 @@
 #include <array>
 #include "Primitive.h"
 #include "Shader.h"
-#include "ScreenBuffer.h"
+
+class ScreenBuffer;
 
 class Renderer;
 

@@ -3,6 +3,7 @@
 //
 
 #include "Rasterizer.h"
+#include "ScreenBuffer.h"
 #include "Renderer.h"
 
 Rasterizer::Rasterizer(ScreenBuffer &screenBuffer, Primitive::Material &material,

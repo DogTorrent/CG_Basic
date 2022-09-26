@@ -4,6 +4,7 @@
 
 #include "Renderer.h"
 #include "Rasterizer.h"
+#include "ScreenBuffer.h"
 
 Renderer::Renderer(ScreenBuffer &screenBuffer) : screenBuffer(screenBuffer) {};
 
