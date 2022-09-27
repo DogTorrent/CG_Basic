@@ -19,6 +19,10 @@ struct RendererPayload {
     std::deque<Primitive::Light> &lightList;
 };
 
+enum RenderMode {
+    DEFAULT, LINE_ONLY
+};
+
 class Renderer {
 public:
     ScreenBuffer &screenBuffer;
@@ -28,8 +32,9 @@ public:
     Eigen::Matrix4f viewMatrix;
     Eigen::Matrix4f projectionMatrix;
     std::deque<Primitive::Light> lightList;
+    RenderMode renderMode;
 
-    Renderer(ScreenBuffer &screenBuffer);
+    Renderer(ScreenBuffer &screenBuffer, RenderMode renderMode=DEFAULT);
 
     void renderGeometry(const RendererPayload &payload);
 

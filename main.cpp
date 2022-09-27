@@ -36,6 +36,7 @@ int main() {
                                      {500, 500, 500}});
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
+    sceneObject.renderMode = DEFAULT;
 
     std::string windowName = "Software Renderer";
     cvui::init(windowName);
@@ -56,50 +57,93 @@ int main() {
             toolbarComponent.f3Row(sceneObject.modelPos.x(),
                                    sceneObject.modelPos.y(),
                                    sceneObject.modelPos.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Object Scaling");
             toolbarComponent.f3Row(sceneObject.scalingRatio.x(),
                                    sceneObject.scalingRatio.y(),
                                    sceneObject.scalingRatio.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Object Rotation");
             toolbarComponent.f3Row(sceneObject.rotationAxis.x(),
                                    sceneObject.rotationAxis.y(),
                                    sceneObject.rotationAxis.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
-            toolbarComponent.f1Row(sceneObject.rotationDegree, "Angle Degree", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
+            toolbarComponent.f1Row(sceneObject.rotationDegree, "degree:", !isRendering);
             cvui::space(0);
 
             cvui::text("Camera Position");
             toolbarComponent.f3Row(sceneObject.cameraPos.x(),
                                    sceneObject.cameraPos.y(),
                                    sceneObject.cameraPos.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Camera Top Axis");
             toolbarComponent.f3Row(sceneObject.cameraTop.x(),
                                    sceneObject.cameraTop.y(),
                                    sceneObject.cameraTop.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Camera Toward Axis");
             toolbarComponent.f3Row(sceneObject.cameraToward.x(),
                                    sceneObject.cameraToward.y(),
                                    sceneObject.cameraToward.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Light 0 Position");
             toolbarComponent.f3Row(sceneObject.lightList[0].pos.x(),
                                    sceneObject.lightList[0].pos.y(),
                                    sceneObject.lightList[0].pos.z(),
-                                   "X:", "Y:", "Z:", !isRendering);
+                                   "x:", "y:", "z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Fragment Shader");
+            cvui::beginRow(toolbarWidth, -1, padding);
+            {
+                auto pFragmentShader = sceneObject.fragmentShader.target < void(*)
+                (Shader::FragmentShaderPayload &) > ();
+
+                bool enableBlinnPhong = *pFragmentShader == Shader::blinnPhongFragmentShader;
+                enableBlinnPhong = cvui::checkbox("Blinn-Phong", &enableBlinnPhong);
+                if (!isRendering && enableBlinnPhong) {
+                    sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
+                }
+
+                bool enableTexture = *pFragmentShader == Shader::textureFragmentShader;
+                enableTexture = cvui::checkbox("Texture", &enableTexture);
+                if (!isRendering && enableTexture) {
+                    sceneObject.fragmentShader = Shader::textureFragmentShader;
+                }
+
+                if (!isRendering && !enableBlinnPhong && !enableTexture) {
+                    sceneObject.fragmentShader = Shader::emptyFragmentShader;
+                }
+            }
+            cvui::endRow();
+            cvui::space(0);
+
+            cvui::text("Render Mode");
+            cvui::beginRow(toolbarWidth, -1, padding);
+            {
+                bool enableDefaultMode = sceneObject.renderMode == DEFAULT;
+                enableDefaultMode = cvui::checkbox("DEFAULT", &enableDefaultMode);
+                if (!isRendering && enableDefaultMode) {
+                    sceneObject.renderMode = DEFAULT;
+                }
+
+                bool enableLineOnlyMode = sceneObject.renderMode == LINE_ONLY;
+                enableLineOnlyMode = cvui::checkbox("LINE_ONLY", &enableLineOnlyMode);
+                if (!isRendering && enableLineOnlyMode) {
+                    sceneObject.renderMode = LINE_ONLY;
+                }
+            }
+            cvui::endRow();
             cvui::space(0);
 
             cvui::beginRow(toolbarWidth, -1, padding);
@@ -133,15 +177,14 @@ int main() {
 
             if (isRendering) {
                 cvui::text("Rendering...");
+                cvui::space(0);
             }
-            cvui::space(0);
         }
         cvui::endColumn();
 
         cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
         image.convertTo(image, CV_8UC3, 1.0f);
         cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-
         cvui::image(frame, 0, 0, image);
 
         cvui::imshow(windowName, frame);

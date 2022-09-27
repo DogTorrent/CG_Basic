@@ -12,6 +12,7 @@
 #include <opencv2/highgui.hpp>
 #include "Primitive.h"
 #include "Shader.h"
+#include "Renderer.h"
 
 class Renderer;
 
@@ -34,6 +35,7 @@ public:
     std::deque<Primitive::Light> lightList;
     std::function<void(Shader::VertexShaderPayload &)> vertexShader;
     std::function<void(Shader::FragmentShaderPayload &)> fragmentShader;
+    RenderMode renderMode = DEFAULT;
 
     void draw(Renderer &renderer);
 };

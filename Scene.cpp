@@ -14,6 +14,7 @@ void SceneObject::draw(Renderer &renderer) {
                                                            TransformMatrix::getMovingMatrix(modelPos));
     renderer.viewMatrix = TransformMatrix::getViewMatrix(cameraPos, cameraToward, cameraTop);
     renderer.projectionMatrix = TransformMatrix::getProjectionMatrix(FoV, aspectRatio, nearPaneZ, farPaneZ);
+    renderer.renderMode = renderMode;
     for (auto &geometry: geometryList) {
         RendererPayload rendererPayload{geometry, vertexShader, fragmentShader, lightList};
         renderer.renderGeometry(rendererPayload);
@@ -23,8 +24,8 @@ void SceneObject::draw(Renderer &renderer) {
 void Scene::draw() {
     if (!screenBuffer) return;
     screenBuffer->clearBuffer();
-    Renderer renderer(*screenBuffer);
     for (auto pSceneObject: pSceneObjectList) {
+        Renderer renderer(*screenBuffer);
         pSceneObject->draw(renderer);
     }
 }

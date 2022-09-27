@@ -6,7 +6,8 @@
 #include "Rasterizer.h"
 #include "ScreenBuffer.h"
 
-Renderer::Renderer(ScreenBuffer &screenBuffer) : screenBuffer(screenBuffer) {};
+Renderer::Renderer(ScreenBuffer &screenBuffer, RenderMode renderMode) : screenBuffer(screenBuffer),
+                                                                        renderMode(renderMode) {};
 
 // transform the light from world space to view space
 void Renderer::transformLights() {
@@ -80,6 +81,7 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
             vertex.pos.z() = 0.5f * (float) MAX_DEPTH * (vertex.pos.z() + 1.0f);
         }
         RasterizerPayload rasterizerPayload{triangleVertexes, triangleViewSpacePos, lightList};
-        rasterizer.rasterizeTriangle(rasterizerPayload);
+        if (renderMode == DEFAULT) rasterizer.rasterizeTriangle(rasterizerPayload);
+        else if (renderMode == LINE_ONLY) rasterizer.rasterizeTriangleLine(rasterizerPayload);
     }
 }
