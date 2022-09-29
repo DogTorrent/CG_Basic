@@ -5,40 +5,36 @@
 #ifndef CG_BASIC_RASTERIZER_H
 #define CG_BASIC_RASTERIZER_H
 
-
 #include <array>
 #include "Primitive.h"
 #include "Shader.h"
 
 class ScreenBuffer;
 
-class Renderer;
-
 struct RasterizerPayload {
-    std::array<Primitive::Vertex *, 3> &triangleVertexes;
-    std::array<Eigen::Vector3f, 3> &vertexesViewSpacePos;
+    std::array<Primitive::GPUVertex *, 3> &triangleVertexes;
     std::deque<Primitive::Light> &lightList;
 };
 
 class Rasterizer {
 public:
     Rasterizer(ScreenBuffer &screenBuffer, Primitive::Material &material,
-               std::function<void(Shader::FragmentShaderPayload &)> &fragmentShader);
+               std::function<void(const Shader::FragmentShaderPayload &)> &fragmentShader);
 
     ScreenBuffer &screenBuffer;
     Primitive::Material &material;
-    std::function<void(Shader::FragmentShaderPayload &)> &fragmentShader;
+    std::function<void(const Shader::FragmentShaderPayload &)> &fragmentShader;
 
     virtual void rasterizeTriangle(const RasterizerPayload &payload);
 
-    static bool checkInsideTriangle(float posX, float posY, std::array<Primitive::Vertex *, 3> &triangleVertexes);
+    static bool checkInsideTriangle(float posX, float posY, std::array<Primitive::GPUVertex *, 3> &triangleVertexes);
 
     static std::array<float, 3>
-    getBarycentricCoordinates(float x, float y, std::array<Primitive::Vertex *, 3> &triangleVertexes);
+    getBarycentricCoordinates(float x, float y, std::array<Primitive::GPUVertex *, 3> &triangleVertexes);
 
     static std::array<float, 3>
     convertBarycentricCoordinates(float screenSpaceAlpha, float screenSpaceBeta, float screenSpaceGamma,
-                                  std::array<Eigen::Vector3f, 3> &vertexesViewSpacePos);
+                                  std::array<Primitive::GPUVertex *, 3> &triangleVertexes);
 
     void rasterizeTriangleLine(const RasterizerPayload &payload);
 

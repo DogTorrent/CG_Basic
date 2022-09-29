@@ -21,24 +21,23 @@ namespace Shader {
     };
 
     struct VertexShaderPayload {
-        Primitive::Vertex &vertex;
-        Eigen::Vector3f &viewSpacePos;
+        Primitive::GPUVertex &vertex;
         Eigen::Matrix4f &modelMatrix;
         Eigen::Matrix4f &viewMatrix;
         Eigen::Matrix4f &projectionMatrix;
     };
 
-    void basicVertexShader(VertexShaderPayload &payload);
+    void basicVertexShader(const VertexShaderPayload &payload);
 
-    void emptyVertexShader(VertexShaderPayload &payload);
+    void emptyVertexShader(const VertexShaderPayload &payload);
 
-    void basicFragmentShader(FragmentShaderPayload &payload);
+    void basicFragmentShader(const FragmentShaderPayload &payload);
 
-    void emptyFragmentShader(FragmentShaderPayload &payload);
+    void emptyFragmentShader(const FragmentShaderPayload &payload);
 
-    void textureFragmentShader(FragmentShaderPayload &payload);
+    void textureFragmentShader(const FragmentShaderPayload &payload);
 
-    void blinnPhongFragmentShader(FragmentShaderPayload &payload);
+    void blinnPhongFragmentShader(const FragmentShaderPayload &payload);
 };
 
 

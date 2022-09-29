@@ -7,43 +7,18 @@
 
 
 #include <deque>
-#include <eigen3/Eigen/Core>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
 #include "Primitive.h"
 #include "Shader.h"
-#include "Renderer.h"
-
-class Renderer;
-
 class ScreenBuffer;
-
-class SceneObject {
-public:
-    std::deque<Primitive::Geometry> geometryList;
-    Eigen::Vector3f scalingRatio;
-    Eigen::Vector4f rotationAxis;
-    float rotationDegree = 0;
-    Eigen::Vector4f modelPos;
-    Eigen::Vector4f cameraPos;
-    Eigen::Vector4f cameraToward;
-    Eigen::Vector4f cameraTop;
-    float FoV = 45;
-    float aspectRatio = 1;
-    float nearPaneZ = 1;
-    float farPaneZ = 50;
-    std::deque<Primitive::Light> lightList;
-    std::function<void(Shader::VertexShaderPayload &)> vertexShader;
-    std::function<void(Shader::FragmentShaderPayload &)> fragmentShader;
-    RenderMode renderMode = DEFAULT;
-
-    void draw(Renderer &renderer);
-};
+class SceneObject;
+class CameraObject;
 
 class Scene {
 public:
     ScreenBuffer *screenBuffer = nullptr;
     std::deque<SceneObject *> pSceneObjectList;
+    CameraObject *cameraObject;
+    std::deque<Primitive::Light> lightList;
 
     void draw();
 };

@@ -3,10 +3,11 @@
 //
 
 #include "Primitive.h"
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
-Primitive::Vertex::Vertex(Eigen::Vector4f pos, Eigen::Vector3f color, Eigen::Vector2f uv,
-                          Eigen::Vector3f normal) : pos(std::move(pos)), color(std::move(color)), uv(std::move(uv)),
-                                                    normal(std::move(normal)) {
+Primitive::Vertex::Vertex(Eigen::Vector4f pos, Eigen::Vector3f color, Eigen::Vector2f uv, Eigen::Vector3f normal)
+        : pos(std::move(pos)), color(std::move(color)), uv(std::move(uv)), normal(std::move(normal)) {
 }
 
 Primitive::Texture::Texture(const std::string &name) {
@@ -37,4 +38,11 @@ void Primitive::Texture::copyTo(Primitive::Texture &dest) {
 
 bool Primitive::Texture::isEmpty() {
     return image_data.empty();
+}
+
+Primitive::GPUVertex::GPUVertex(const Primitive::Vertex &vertex) {
+    pos = vertex.pos;
+    normal = vertex.normal;
+    uv = vertex.uv;
+    color = vertex.color;
 }

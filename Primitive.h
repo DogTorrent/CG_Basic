@@ -7,10 +7,9 @@
 
 #include <array>
 #include <eigen3/Eigen/Core>
-#include <opencv2/core/mat.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
 #include <deque>
+#include <opencv2/core/hal/interface.h>
+#include <opencv2/core/mat.hpp>
 
 namespace Primitive {
 
@@ -18,6 +17,7 @@ namespace Primitive {
     public:
         Vertex(Eigen::Vector4f pos, Eigen::Vector3f color, Eigen::Vector2f uv,
                Eigen::Vector3f normal);
+
         Vertex() = default;
 
     public:
@@ -25,6 +25,18 @@ namespace Primitive {
         Eigen::Vector3f color;
         Eigen::Vector2f uv;
         Eigen::Vector3f normal;
+    };
+
+    class GPUVertex : public Vertex {
+    public:
+        Eigen::Vector4f viewSpacePos;
+        Eigen::Vector4f clipSpacePos;
+        Eigen::Vector4f ndcSpacePos;
+        Eigen::Vector3f screenSpacePos;
+
+        explicit GPUVertex(const Vertex &vertex);
+
+        GPUVertex() = default;
     };
 
     class Light {
@@ -45,7 +57,9 @@ namespace Primitive {
         void copyTo(Texture &dest);
 
         Eigen::Vector3f getValue(float u, float v);
+
         void cleanData();
+
         bool isEmpty();
     };
 

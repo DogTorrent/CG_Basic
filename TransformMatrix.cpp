@@ -47,7 +47,7 @@ TransformMatrix::getViewMatrix(const Eigen::Vector4f &cameraPos, const Eigen::Ve
 
 Eigen::Matrix4f TransformMatrix::getProjectionMatrix(float FoV, float aspectRatio, float near, float far) {
     // top and right in the near pane
-    auto top = (float) abs(near * tan(FoV / 2 / 180 * EIGEN_PI));
+    auto top = near * (float) tan(FoV / 2 / 180 * EIGEN_PI);
     float right = top * aspectRatio;
     // z-pane:
     // point => persp:

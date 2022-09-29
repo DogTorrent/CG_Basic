@@ -5,32 +5,31 @@
 #include "Shader.h"
 
 namespace Shader {
-    void basicVertexShader(VertexShaderPayload &payload) {
+    void basicVertexShader(const VertexShaderPayload &payload) {
         Eigen::Matrix4f mv = payload.viewMatrix * payload.modelMatrix;
         // model and view transform
         // model_space -> world_space -> view_space
-        payload.vertex.pos = mv * payload.vertex.pos;
-        payload.viewSpacePos = {payload.vertex.pos.x(), payload.vertex.pos.y(), payload.vertex.pos.z()};
+        payload.vertex.viewSpacePos = mv * payload.vertex.pos;
 
         // projection transform
         // view_space -> clip_space
-        payload.vertex.pos = payload.projectionMatrix * payload.vertex.pos;
+        payload.vertex.clipSpacePos = payload.projectionMatrix * payload.vertex.viewSpacePos;
     };
 
-    void emptyVertexShader(VertexShaderPayload &payload) {
+    void emptyVertexShader(const VertexShaderPayload &payload) {
     };
 
-    void basicFragmentShader(FragmentShaderPayload &payload) {
+    void basicFragmentShader(const FragmentShaderPayload &payload) {
     };
 
-    void emptyFragmentShader(FragmentShaderPayload &payload) {
+    void emptyFragmentShader(const FragmentShaderPayload &payload) {
     };
 
-    void textureFragmentShader(FragmentShaderPayload &payload) {
+    void textureFragmentShader(const FragmentShaderPayload &payload) {
         payload.color = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y());
     };
 
-    void blinnPhongFragmentShader(FragmentShaderPayload &payload) {
+    void blinnPhongFragmentShader(const FragmentShaderPayload &payload) {
         if (payload.lights.empty()) return;
         Eigen::Vector3f ka = payload.material.ka; //Eigen::Vector3f(0.005, 0.005, 0.005); // Ambient factor
         Eigen::Vector3f ks = payload.material.ks; //Eigen::Vector3f(0.7937, 0.7937, 0.7937); // Specular factor, or called Shininess

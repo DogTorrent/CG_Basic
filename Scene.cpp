@@ -6,26 +6,31 @@
 #include "TransformMatrix.h"
 #include "Renderer.h"
 #include "ScreenBuffer.h"
-
-void SceneObject::draw(Renderer &renderer) {
-    renderer.modelMatrix = TransformMatrix::getModelMatrix(TransformMatrix::getScalingMatrix(scalingRatio),
-                                                           TransformMatrix::getRotationMatrix(
-                                                                   rotationAxis, rotationDegree),
-                                                           TransformMatrix::getMovingMatrix(modelPos));
-    renderer.viewMatrix = TransformMatrix::getViewMatrix(cameraPos, cameraToward, cameraTop);
-    renderer.projectionMatrix = TransformMatrix::getProjectionMatrix(FoV, aspectRatio, nearPaneZ, farPaneZ);
-    renderer.renderMode = renderMode;
-    for (auto &geometry: geometryList) {
-        RendererPayload rendererPayload{geometry, vertexShader, fragmentShader, lightList};
-        renderer.renderGeometry(rendererPayload);
-    }
-}
+#include "Object.h"
 
 void Scene::draw() {
-    if (!screenBuffer) return;
+    if (!screenBuffer || !cameraObject) return;
     screenBuffer->clearBuffer();
+
+    Renderer renderer(*screenBuffer, *cameraObject);
+    renderer.viewMatrix = TransformMatrix::getViewMatrix(cameraObject->pos,
+                                                         cameraObject->toward,
+                                                         cameraObject->top);
+    renderer.projectionMatrix = TransformMatrix::getProjectionMatrix(cameraObject->FoV,
+                                                                     cameraObject->aspectRatio,
+                                                                     cameraObject->nearPaneZ,
+                                                                     cameraObject->farPaneZ);
     for (auto pSceneObject: pSceneObjectList) {
-        Renderer renderer(*screenBuffer);
-        pSceneObject->draw(renderer);
+        renderer.modelMatrix = TransformMatrix::getModelMatrix(
+                TransformMatrix::getScalingMatrix(pSceneObject->scalingRatio),
+                TransformMatrix::getRotationMatrix(pSceneObject->rotationAxis, pSceneObject->rotationDegree),
+                TransformMatrix::getMovingMatrix(pSceneObject->modelPos));
+        renderer.renderMode = pSceneObject->renderMode;
+
+        for (auto &geometry: pSceneObject->geometryList) {
+            RendererPayload rendererPayload{geometry, pSceneObject->vertexShader, pSceneObject->fragmentShader,
+                                            lightList};
+            renderer.renderGeometry(rendererPayload);
+        }
     }
 }

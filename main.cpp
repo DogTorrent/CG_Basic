@@ -6,10 +6,10 @@
 #include "ThirdParty/cvui.h"
 #include "ThirdParty/OBJ_Loader.h"
 #include "Primitive.h"
-#include "Renderer.h"
 #include "Scene.h"
 #include "ScreenBuffer.h"
 #include "ToolbarComponent.h"
+#include "Object.h"
 
 std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
 
@@ -19,21 +19,23 @@ int main() {
     scene.screenBuffer = &screenBuffer;
     SceneObject sceneObject;
     scene.pSceneObjectList.push_back(&sceneObject);
+    CameraObject cameraObject;
+    scene.cameraObject = &cameraObject;
 
-    sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
-    sceneObject.scalingRatio = {2.5, 2.5, 2.5};
+    sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_collapse.obj)");
+    sceneObject.scalingRatio = {3, 3, 3};
     sceneObject.rotationAxis = {0, 1, 0, 0};
-    sceneObject.rotationDegree = 30;
+    sceneObject.rotationDegree = 90;
     sceneObject.modelPos = {0, 0, 0, 1};
-    sceneObject.cameraPos = {0, 0, -15, 1};
-    sceneObject.cameraToward = {0, 0, 1, 0};
-    sceneObject.cameraTop = {0, 1, 0, 0};
-    sceneObject.FoV = 45;
-    sceneObject.aspectRatio = 1;
-    sceneObject.nearPaneZ = 1;
-    sceneObject.farPaneZ = 50;
-    sceneObject.lightList.push_back({{20,  0,   -20},
-                                     {500, 500, 500}});
+    cameraObject.pos = {0, 0, -15, 1};
+    cameraObject.toward = {0, 0, 1, 0};
+    cameraObject.top = {0, 1, 0, 0};
+    cameraObject.FoV = 60;
+    cameraObject.aspectRatio = 1;
+    cameraObject.nearPaneZ = 0.1;
+    cameraObject.farPaneZ = 50;
+    scene.lightList.push_back({{20,  0,   -20},
+                               {500, 500, 500}});
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
     sceneObject.renderMode = DEFAULT;
@@ -44,6 +46,7 @@ int main() {
     int padding = 10;
     ToolbarComponent toolbarComponent{toolbarWidth, padding};
     cv::Mat frame = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height), CV_8UC3);
+    cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
 
     bool isRendering = false;
     while (cv::getWindowProperty(windowName, cv::WINDOW_AUTOSIZE) >= 0) {
@@ -76,38 +79,39 @@ int main() {
             cvui::space(0);
 
             cvui::text("Camera Position");
-            toolbarComponent.f3Row(sceneObject.cameraPos.x(),
-                                   sceneObject.cameraPos.y(),
-                                   sceneObject.cameraPos.z(),
+            toolbarComponent.f3Row(cameraObject.pos.x(),
+                                   cameraObject.pos.y(),
+                                   cameraObject.pos.z(),
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Camera Top Axis");
-            toolbarComponent.f3Row(sceneObject.cameraTop.x(),
-                                   sceneObject.cameraTop.y(),
-                                   sceneObject.cameraTop.z(),
+            toolbarComponent.f3Row(cameraObject.top.x(),
+                                   cameraObject.top.y(),
+                                   cameraObject.top.z(),
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Camera Toward Axis");
-            toolbarComponent.f3Row(sceneObject.cameraToward.x(),
-                                   sceneObject.cameraToward.y(),
-                                   sceneObject.cameraToward.z(),
+            toolbarComponent.f3Row(cameraObject.toward.x(),
+                                   cameraObject.toward.y(),
+                                   cameraObject.toward.z(),
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Light 0 Position");
-            toolbarComponent.f3Row(sceneObject.lightList[0].pos.x(),
-                                   sceneObject.lightList[0].pos.y(),
-                                   sceneObject.lightList[0].pos.z(),
+            toolbarComponent.f3Row(scene.lightList[0].pos.x(),
+                                   scene.lightList[0].pos.y(),
+                                   scene.lightList[0].pos.z(),
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
             cvui::text("Fragment Shader");
             cvui::beginRow(toolbarWidth, -1, padding);
             {
-                auto pFragmentShader = sceneObject.fragmentShader.target < void(*)
-                (Shader::FragmentShaderPayload &) > ();
+                auto
+                pFragmentShader = sceneObject.fragmentShader.target < void(*)
+                (const Shader::FragmentShaderPayload &) > ();
 
                 bool enableBlinnPhong = *pFragmentShader == Shader::blinnPhongFragmentShader;
                 enableBlinnPhong = cvui::checkbox("Blinn-Phong", &enableBlinnPhong);
@@ -165,7 +169,7 @@ int main() {
                 }
                 if (cvui::button("Reload .obj File")) {
                     if (!isRendering) {
-                        sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_triangulated_mod.obj)");
+                        sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_collapse.obj)");
                     }
                 }
                 if (cvui::button("Exit")) {
@@ -182,15 +186,34 @@ int main() {
         }
         cvui::endColumn();
 
-        cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
-        image.convertTo(image, CV_8UC3, 1.0f);
-        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+        if (!isRendering) {
+            image = {screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data()};
+            image.convertTo(image, CV_8UC3, 1.0f);
+            cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
+        }
         cvui::image(frame, 0, 0, image);
 
         cvui::imshow(windowName, frame);
 
-        if (cv::waitKey(20) == 27) {
+        int key = cv::waitKey(20);
+        if (key == 27) {
             break;
+        } else if (key == 'a' && !isRendering) {
+            isRendering = true;
+            cameraObject.pos.x() -= 0.1;
+            std::thread t([&]() -> void {
+                scene.draw();
+                isRendering = false;
+            });
+            t.detach();
+        } else if (key == 'd' && !isRendering) {
+            isRendering = true;
+            cameraObject.pos.x() += 0.1;
+            std::thread t([&]() -> void {
+                scene.draw();
+                isRendering = false;
+            });
+            t.detach();
         }
     }
 }
