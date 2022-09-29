@@ -25,7 +25,7 @@ int main() {
     sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_collapse.obj)");
     sceneObject.scalingRatio = {3, 3, 3};
     sceneObject.rotationAxis = {0, 1, 0, 0};
-    sceneObject.rotationDegree = 90;
+    sceneObject.rotationDegree = 30;
     sceneObject.modelPos = {0, 0, 0, 1};
     cameraObject.pos = {0, 0, -15, 1};
     cameraObject.toward = {0, 0, 1, 0};
@@ -187,10 +187,10 @@ int main() {
         cvui::endColumn();
 
         if (!isRendering) {
-            image = {screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data()};
-            image.convertTo(image, CV_8UC3, 1.0f);
-            cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
         }
+        image = {screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data()};
+        image.convertTo(image, CV_8UC3, 1.0f);
+        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
         cvui::image(frame, 0, 0, image);
 
         cvui::imshow(windowName, frame);
@@ -200,7 +200,7 @@ int main() {
             break;
         } else if (key == 'a' && !isRendering) {
             isRendering = true;
-            cameraObject.pos.x() -= 0.1;
+            cameraObject.pos.x() -= 0.5;
             std::thread t([&]() -> void {
                 scene.draw();
                 isRendering = false;
@@ -208,7 +208,7 @@ int main() {
             t.detach();
         } else if (key == 'd' && !isRendering) {
             isRendering = true;
-            cameraObject.pos.x() += 0.1;
+            cameraObject.pos.x() += 0.5;
             std::thread t([&]() -> void {
                 scene.draw();
                 isRendering = false;

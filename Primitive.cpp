@@ -46,3 +46,10 @@ Primitive::GPUVertex::GPUVertex(const Primitive::Vertex &vertex) {
     uv = vertex.uv;
     color = vertex.color;
 }
+
+Primitive::GPUVertex::GPUVertex(const Primitive::GPUVertex &vertex)  : Vertex(vertex) {
+    viewSpacePos = vertex.viewSpacePos;
+    clipSpacePos = vertex.clipSpacePos;
+    ndcSpacePos = vertex.ndcSpacePos;
+    screenSpacePos = vertex.screenSpacePos;
+}

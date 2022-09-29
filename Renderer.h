@@ -39,9 +39,14 @@ public:
 
     void renderGeometry(const RendererPayload &payload);
 
-    bool clipTriangle(const Eigen::Vector3f& paneNormal, const Eigen::Vector3f& panePoint, int indexesI);
+    bool clipTriangle(int indexesI);
 
     void transformLights();
+
+    template<typename T>
+    T lineLerp(T &a1,T &a2, float weight);
+
+    Primitive::GPUVertex lineLerp(Primitive::GPUVertex &a1, Primitive::GPUVertex &a2, float weight);
 };
 
 #endif //CG_BASIC_RENDERER_H

@@ -49,44 +49,13 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
         Shader::basicVertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
     }
 
-    auto cosHalfVFoV = (float) cos(cameraObject.FoV / 2 / 180 * EIGEN_PI);
-    auto sinHalfVFoV = (float) sin(cameraObject.FoV / 2 / 180 * EIGEN_PI);
-    auto halfHFoV = atan(cameraObject.aspectRatio * (float) tan(cameraObject.FoV / 2 / 180 * EIGEN_PI));
-    auto cosHalfHFoV = (float) cos(halfHFoV);
-    auto sinHalfHFoV = (float) sin(halfHFoV);
     Rasterizer rasterizer(screenBuffer, material, payload.fragmentShader);
     for (int indexesI = 0; indexesI < indexes.size(); indexesI += 3) {
+        if (!clipTriangle(indexesI)) continue;
+
         std::array<Primitive::GPUVertex *, 3> triangleVertexes{&vertexes[indexes[indexesI + 0]],
                                                                &vertexes[indexes[indexesI + 1]],
                                                                &vertexes[indexes[indexesI + 2]]};
-        if ((triangleVertexes[0]->clipSpacePos - triangleVertexes[1]->clipSpacePos).isZero(1e-5)
-            || (triangleVertexes[1]->clipSpacePos - triangleVertexes[2]->clipSpacePos).isZero(1e-5)
-            || (triangleVertexes[2]->clipSpacePos - triangleVertexes[0]->clipSpacePos).isZero(1e-5))
-            continue;
-        // clip
-        Eigen::Vector3f paneNormal;
-        Eigen::Vector3f panePoint(0, 0, 0);
-        //top
-        paneNormal = {0, cosHalfVFoV, -sinHalfVFoV};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-        //bottom
-        paneNormal = {0, -cosHalfVFoV, -sinHalfVFoV};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-        //left
-        paneNormal = {cosHalfHFoV, 0, -sinHalfHFoV};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-        //right
-        paneNormal = {-cosHalfHFoV, 0, -sinHalfHFoV};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-        //near
-        paneNormal = {0, 0, -1};
-        panePoint = {0, 0, -cameraObject.nearPaneZ};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-        //far
-        paneNormal = {0, 0, 1};
-        panePoint = {0, 0, cameraObject.farPaneZ};
-        if (!clipTriangle(paneNormal, panePoint, indexesI)) continue;
-
         for (int i = 0; i < 3; ++i) {
             Primitive::GPUVertex &vertex = *triangleVertexes[i];
 
@@ -106,9 +75,12 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
         }
 
         // ignore line/dot
-        if ((triangleVertexes[0]->screenSpacePos.head(2) - triangleVertexes[1]->screenSpacePos.head(2)).isZero(1e-5)
-            || (triangleVertexes[1]->screenSpacePos.head(2) - triangleVertexes[2]->screenSpacePos.head(2)).isZero(1e-5)
-            || (triangleVertexes[2]->screenSpacePos.head(2) - triangleVertexes[0]->screenSpacePos.head(2)).isZero(1e-5))
+        if (abs((triangleVertexes[0]->screenSpacePos.head(2) - triangleVertexes[1]->screenSpacePos.head(2)).norm()) <
+            1e-5
+            || abs((triangleVertexes[1]->screenSpacePos.head(2) - triangleVertexes[2]->screenSpacePos.head(2)).norm()) <
+               1e-5
+            || abs((triangleVertexes[2]->screenSpacePos.head(2) - triangleVertexes[0]->screenSpacePos.head(2)).norm()) <
+               1e-5)
             continue;
 
         RasterizerPayload rasterizerPayload{triangleVertexes, lightList};
@@ -117,99 +89,92 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
     }
 }
 
-bool Renderer::clipTriangle(const Eigen::Vector3f &paneNormal, const Eigen::Vector3f &panePoint, int indexesI) {
-    std::array<Primitive::GPUVertex *, 3> triangleVertexes{&vertexes[indexes[indexesI + 0]],
-                                                           &vertexes[indexes[indexesI + 1]],
-                                                           &vertexes[indexes[indexesI + 2]]};
-    std::array<float, 3> dotProduct{(triangleVertexes[0]->clipSpacePos.head(3) - panePoint).dot(paneNormal),
-                                    (triangleVertexes[1]->clipSpacePos.head(3) - panePoint).dot(paneNormal),
-                                    (triangleVertexes[2]->clipSpacePos.head(3) - panePoint).dot(paneNormal)};
-    int outCount = 0;
-    for (auto item: dotProduct) {
-        if (item > 1e-5) ++outCount;
+bool Renderer::clipTriangle(int indexesI) {
+    std::deque<Primitive::GPUVertex> verts;
+    verts.push_back(vertexes[indexes[indexesI + 0]]);
+    verts.push_back(vertexes[indexes[indexesI + 1]]);
+    verts.push_back(vertexes[indexes[indexesI + 2]]);
+    std::deque<Eigen::Vector4f> paneCoeffs = {
+            //near
+            {0,  0,  -1, 1},
+            //far
+            {0,  0,  1,  1},
+            //left
+            {-1, 0,  0,  1},
+            //right
+            {1,  0,  0,  1},
+            //bottom
+            {0,  -1, 0,  1},
+            //top
+            {0,  1,  0,  1},
+    };
+    bool allInside = true;
+    float offsetRange = 1e-5;
+    for (auto &paneCoeff: paneCoeffs) {
+        for (auto &currV: verts) {
+            if (currV.clipSpacePos.dot(paneCoeff) < -offsetRange) {
+                allInside = false;
+                break;
+            }
+        }
+        if (!allInside) break;
     }
-    if (outCount == 0) return true;
-    // 1 out but 2 in
-    if (outCount == 1) {
-        int outI = 0;
-        while (dotProduct[outI] <= 1e-5) ++outI;
-        float alpha, beta;
+    if (allInside) return true;
 
-        Primitive::GPUVertex newV1;
-        alpha = dotProduct[outI] / (dotProduct[outI] - dotProduct[(outI + 2) % 3]);
-        beta = 1 - alpha;
-        newV1.pos = alpha * triangleVertexes[(outI + 2) % 3]->pos + beta * triangleVertexes[outI]->pos;
-        newV1.clipSpacePos =
-                alpha * triangleVertexes[(outI + 2) % 3]->clipSpacePos + beta * triangleVertexes[outI]->clipSpacePos;
-        newV1.viewSpacePos =
-                alpha * triangleVertexes[(outI + 2) % 3]->viewSpacePos + beta * triangleVertexes[outI]->viewSpacePos;
-        newV1.uv = alpha * triangleVertexes[(outI + 2) % 3]->uv + beta * triangleVertexes[outI]->uv;
-        newV1.normal = alpha * triangleVertexes[(outI + 2) % 3]->normal + beta * triangleVertexes[outI]->normal;
-        newV1.color = alpha * triangleVertexes[(outI + 2) % 3]->color + beta * triangleVertexes[outI]->color;
-
-        Primitive::GPUVertex newV2;
-        alpha = dotProduct[outI] / (dotProduct[outI] - dotProduct[(outI + 1) % 3]);
-        beta = 1 - alpha;
-        newV2.pos = alpha * triangleVertexes[(outI + 1) % 3]->pos + beta * triangleVertexes[outI]->pos;
-        newV2.clipSpacePos =
-                alpha * triangleVertexes[(outI + 1) % 3]->clipSpacePos + beta * triangleVertexes[outI]->clipSpacePos;
-        newV2.viewSpacePos =
-                alpha * triangleVertexes[(outI + 1) % 3]->viewSpacePos + beta * triangleVertexes[outI]->viewSpacePos;
-        newV2.uv = alpha * triangleVertexes[(outI + 1) % 3]->uv + beta * triangleVertexes[outI]->uv;
-        newV2.normal = alpha * triangleVertexes[(outI + 1) % 3]->normal + beta * triangleVertexes[outI]->normal;
-        newV2.color = alpha * triangleVertexes[(outI + 1) % 3]->color + beta * triangleVertexes[outI]->color;
-
-        vertexes.emplace_back(std::move(newV1));
-        int indexNew1 = (int) vertexes.size() - 1;
-        vertexes.emplace_back(std::move(newV2));
-        int indexNew2 = (int) vertexes.size() - 1;
-
-        indexes.emplace_back(indexes[indexesI] + (outI + 2) % 3);
-        indexes.emplace_back(indexNew1);
-        indexes.emplace_back(indexes[indexesI] + (outI + 1) % 3);
-
-        indexes.emplace_back(indexes[indexesI] + (outI + 1) % 3);
-        indexes.emplace_back(indexNew1);
-        indexes.emplace_back(indexNew2);
-    } else if (outCount == 2) {
-        int inI = 0;
-        while (dotProduct[inI] > 1e-5) ++inI;
-        float alpha, beta;
-
-        Primitive::GPUVertex newV1;
-        alpha = -dotProduct[inI] / (-dotProduct[inI] + dotProduct[(inI + 2) % 3]);
-        beta = 1 - alpha;
-        newV1.pos = alpha * triangleVertexes[(inI + 2) % 3]->pos + beta * triangleVertexes[inI]->pos;
-        newV1.clipSpacePos =
-                alpha * triangleVertexes[(inI + 2) % 3]->clipSpacePos + beta * triangleVertexes[inI]->clipSpacePos;
-        newV1.viewSpacePos =
-                alpha * triangleVertexes[(inI + 2) % 3]->viewSpacePos + beta * triangleVertexes[inI]->viewSpacePos;
-        newV1.uv = alpha * triangleVertexes[(inI + 2) % 3]->uv + beta * triangleVertexes[inI]->uv;
-        newV1.normal = alpha * triangleVertexes[(inI + 2) % 3]->normal + beta * triangleVertexes[inI]->normal;
-        newV1.color = alpha * triangleVertexes[(inI + 2) % 3]->color + beta * triangleVertexes[inI]->color;
-
-        Primitive::GPUVertex newV2;
-        alpha = -dotProduct[inI] / (-dotProduct[inI] + dotProduct[(inI + 1) % 3]);
-        beta = 1 - alpha;
-        newV2.pos = alpha * triangleVertexes[(inI + 1) % 3]->pos + beta * triangleVertexes[inI]->pos;
-        newV2.clipSpacePos =
-                alpha * triangleVertexes[(inI + 1) % 3]->clipSpacePos + beta * triangleVertexes[inI]->clipSpacePos;
-        newV2.viewSpacePos =
-                alpha * triangleVertexes[(inI + 1) % 3]->viewSpacePos + beta * triangleVertexes[inI]->viewSpacePos;
-        newV2.ndcSpacePos =
-                alpha * triangleVertexes[(inI + 1) % 3]->ndcSpacePos + beta * triangleVertexes[inI]->ndcSpacePos;
-        newV2.uv = alpha * triangleVertexes[(inI + 1) % 3]->uv + beta * triangleVertexes[inI]->uv;
-        newV2.normal = alpha * triangleVertexes[(inI + 1) % 3]->normal + beta * triangleVertexes[inI]->normal;
-        newV2.color = alpha * triangleVertexes[(inI + 1) % 3]->color + beta * triangleVertexes[inI]->color;
-
-        vertexes.emplace_back(std::move(newV1));
-        int indexNew1 = (int) vertexes.size() - 1;
-        vertexes.emplace_back(std::move(newV2));
-        int indexNew2 = (int) vertexes.size() - 1;
-
-        indexes.emplace_back(indexes[indexesI] + inI);
-        indexes.emplace_back(indexNew1);
-        indexes.emplace_back(indexNew2);
+    for (auto &paneCoeff: paneCoeffs) {
+        std::deque<Primitive::GPUVertex> newVerts;
+        Primitive::GPUVertex *preV = nullptr;
+        Primitive::GPUVertex *currV = &(verts.back());
+        float preD;
+        float currD = currV->clipSpacePos.dot(paneCoeff);
+        for (auto &vert: verts) {
+            preV = currV;
+            preD = currD;
+            currV = &vert;
+            currD = currV->clipSpacePos.dot(paneCoeff);
+            if ((preD >= offsetRange && currD < -offsetRange) || (preD < -offsetRange && currD >= offsetRange)) {
+                newVerts.emplace_back(lineLerp(*preV, *currV, preD / (preD - currD)));
+            }
+            if (currD >= offsetRange) {
+                newVerts.push_back(*currV);
+            }
+        }
+        if (newVerts.empty() || newVerts.size() < 3) return false;
+        verts = newVerts;
     }
-    return false;
+
+    vertexes.push_back(verts[0]);
+    int index0 = (int) vertexes.size() - 1;
+    vertexes.push_back(verts[1]);
+    int index1 = (int) vertexes.size() - 1;
+    vertexes.push_back(verts[2]);
+    int index2 = (int) vertexes.size() - 1;
+    indexes[indexesI] = index0;
+    indexes[indexesI + 1] = index1;
+    indexes[indexesI + 2] = index2;
+    for (int i = 3; i < verts.size(); ++i) {
+        index1 = index2;
+        vertexes.push_back(verts[i]);
+        index2 = (int) vertexes.size() - 1;
+        indexes.push_back(index0);
+        indexes.push_back(index1);
+        indexes.push_back(index2);
+    }
+    return true;
+}
+
+template<typename T>
+T Renderer::lineLerp(T &a1, T &a2, float weight) {
+    return weight * a2 + (1 - weight) * a1;
+}
+
+Primitive::GPUVertex Renderer::lineLerp(Primitive::GPUVertex &a1, Primitive::GPUVertex &a2, float weight) {
+    Primitive::GPUVertex newV;
+    newV.pos = lineLerp(a1.pos, a2.pos, weight);
+    newV.clipSpacePos = lineLerp(a1.clipSpacePos, a2.clipSpacePos, weight);
+    newV.viewSpacePos = lineLerp(a1.viewSpacePos, a2.viewSpacePos, weight);
+    newV.uv = lineLerp(a1.uv, a2.uv, weight);
+    newV.color = lineLerp(a1.color, a2.color, weight);
+    newV.normal = lineLerp(a1.normal, a2.normal, weight);
+    return newV;
 }

@@ -35,6 +35,7 @@ namespace Primitive {
         Eigen::Vector3f screenSpacePos;
 
         explicit GPUVertex(const Vertex &vertex);
+        GPUVertex(const GPUVertex &vertex);
 
         GPUVertex() = default;
     };
