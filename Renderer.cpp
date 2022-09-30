@@ -120,7 +120,7 @@ bool Renderer::clipTriangle(int indexesI) {
 
     bool allInside = true;
     for (auto &currV: verts) {
-        if (currV.clipSpacePos.w()-1e-5f < 0) {
+        if (currV.clipSpacePos.w() - 1e-5f < 0) {
             allInside = false;
             break;
         }
@@ -152,6 +152,8 @@ bool Renderer::clipTriangle(int indexesI) {
             currD = currV->clipSpacePos.w() - 1e-5f;
             if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
                 newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
+                // Manually set the w value to avoid interpolated wi != -w, which may cause infinite loops
+                newVerts.back().clipSpacePos.w() = -1e-5f;
             }
             if (currD >= 0) {
                 newVerts.push_back(*currV);
@@ -175,6 +177,8 @@ bool Renderer::clipTriangle(int indexesI) {
             currD = currV->clipSpacePos.dot(paneCoeff);
             if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
                 newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
+                // Manually set the w value to avoid interpolated wi != -w, which may cause infinite loops
+                newVerts.back().clipSpacePos.w() = -newVerts.back().clipSpacePos.head(3).dot(paneCoeff.head(3));
             }
             if (currD >= 0) {
                 newVerts.push_back(*currV);
