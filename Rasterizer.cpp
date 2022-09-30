@@ -198,8 +198,6 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
     auto [screenSpaceAlpha, screenSpaceBeta, screenSpaceGamma]
             = getBarycentricCoordinates(pointScreenSpacePos.x(), pointScreenSpacePos.y(),
                                         payload.triangleVertexes);
-    if (_isnanf(screenSpaceAlpha) || _isnanf(screenSpaceBeta) || _isnanf(screenSpaceGamma)) return;
-    if (isinf(screenSpaceAlpha) || isinf(screenSpaceBeta) || isinf(screenSpaceGamma)) return;
 
     // convert barycentric coordinates from screen space to view space
     auto [viewSpaceAlpha, viewSpaceBeta, viewSpaceGamma]
@@ -212,7 +210,7 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
                               + viewSpaceGamma * payload.triangleVertexes[2]->screenSpacePos.z();
 
     // clip out of range
-    if (pointScreenSpacePos.z() < 0 || pointScreenSpacePos.z() > MAX_DEPTH) return;
+    if (pointScreenSpacePos.z() < 0) return;
 
     // z test
     if (pointScreenSpacePos.z() >= screenBuffer.valueInDepthBuffer(pixelX, pixelY))
@@ -225,9 +223,9 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
     Eigen::Vector3f color = viewSpaceAlpha * payload.triangleVertexes[0]->color
                             + viewSpaceBeta * payload.triangleVertexes[1]->color
                             + viewSpaceGamma * payload.triangleVertexes[2]->color;
-    Eigen::Vector3f normal = viewSpaceAlpha * payload.triangleVertexes[0]->normal
-                             + viewSpaceBeta * payload.triangleVertexes[1]->normal
-                             + viewSpaceGamma * payload.triangleVertexes[2]->normal;
+    Eigen::Vector3f normal = (viewSpaceAlpha * payload.triangleVertexes[0]->normal
+                              + viewSpaceBeta * payload.triangleVertexes[1]->normal
+                              + viewSpaceGamma * payload.triangleVertexes[2]->normal).normalized();
     Eigen::Vector2f uv = viewSpaceAlpha * payload.triangleVertexes[0]->uv
                          + viewSpaceBeta * payload.triangleVertexes[1]->uv
                          + viewSpaceGamma * payload.triangleVertexes[2]->uv;

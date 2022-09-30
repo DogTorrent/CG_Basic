@@ -32,6 +32,10 @@ public:
     float aspectRatio = 1;
     float nearPaneZ = 1;
     float farPaneZ = 50;
+    void rotate(const Eigen::Vector4f &axis, float angleDegree);
+    void moveRight(float delta);
+    void moveUp(float delta);
+    void moveForward(float delta);
 };
 
 #endif //CG_BASIC_OBJECT_H

@@ -9,8 +9,6 @@
 #include <vector>
 #include <eigen3/Eigen/Core>
 
-#define MAX_DEPTH 50.f
-
 class ScreenBuffer {
 public:
     int width;

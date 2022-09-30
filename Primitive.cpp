@@ -16,7 +16,7 @@ Primitive::Texture::Texture(const std::string &name) {
 }
 
 Eigen::Vector3f Primitive::Texture::getValue(float u, float v) {
-    if (image_data.empty()) return {1, 1, 1};
+    if (image_data.empty()) return {128, 128, 128};
     if (u < 0) u = 0;
     else if (u > 1) u = 1;
     if (v < 0) v = 0;
@@ -47,7 +47,7 @@ Primitive::GPUVertex::GPUVertex(const Primitive::Vertex &vertex) {
     color = vertex.color;
 }
 
-Primitive::GPUVertex::GPUVertex(const Primitive::GPUVertex &vertex)  : Vertex(vertex) {
+Primitive::GPUVertex::GPUVertex(const Primitive::GPUVertex &vertex) : Vertex(vertex) {
     viewSpacePos = vertex.viewSpacePos;
     clipSpacePos = vertex.clipSpacePos;
     ndcSpacePos = vertex.ndcSpacePos;

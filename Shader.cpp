@@ -31,14 +31,14 @@ namespace Shader {
 
     void blinnPhongFragmentShader(const FragmentShaderPayload &payload) {
         if (payload.lights.empty()) return;
-        Eigen::Vector3f ka = payload.material.ka; //Eigen::Vector3f(0.005, 0.005, 0.005); // Ambient factor
-        Eigen::Vector3f ks = payload.material.ks; //Eigen::Vector3f(0.7937, 0.7937, 0.7937); // Specular factor, or called Shininess
+        Eigen::Vector3f ka = payload.material.ka; // Ambient factor
+        Eigen::Vector3f ks = payload.material.ks; // Specular factor, or called Shininess
         Eigen::Vector3f kd = payload.material.kd;
         if (!payload.material.diffuseTexture.isEmpty())
             kd = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y()) / 255.f; // Diffuse factor
         float ns = payload.material.ns; // Specular range exponent
 
-        Eigen::Vector3f ambientIntensity(10, 10, 10);
+        Eigen::Vector3f ambientIntensity(0.005, 0.005, 0.005);
 
         Eigen::Vector3f La = Eigen::Vector3f::Zero(), Ld = Eigen::Vector3f::Zero(), Ls = Eigen::Vector3f::Zero();
         for (auto &light: payload.lights) {

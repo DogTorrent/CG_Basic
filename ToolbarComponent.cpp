@@ -1,7 +1,6 @@
 //
 // Created by .torrent on 2022/9/27.
 //
-#define CVUI_IMPLEMENTATION
 
 #include <eigen3/Eigen/Core>
 #include "ThirdParty/cvui.h"

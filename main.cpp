@@ -1,9 +1,9 @@
+#define CVUI_IMPLEMENTATION
 
-
+#include "ThirdParty/cvui.h"
 #include <iostream>
 #include <thread>
 #include <opencv2/highgui.hpp>
-#include "ThirdParty/cvui.h"
 #include "ThirdParty/OBJ_Loader.h"
 #include "Primitive.h"
 #include "Scene.h"
@@ -14,41 +14,56 @@
 std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
 
 int main() {
+    std::string sceneObjectPath = R"(Resources/Models/Spot/spot_triangulated_mod.obj)";
+    std::string floorObjectPath = R"(Resources/Models/Spot/floor.obj)";
     Scene scene;
     ScreenBuffer screenBuffer(700, 700);
-    scene.screenBuffer = &screenBuffer;
-    SceneObject sceneObject;
-    scene.pSceneObjectList.push_back(&sceneObject);
+    SceneObject sceneObject, floorObject;
     CameraObject cameraObject;
+    scene.screenBuffer = &screenBuffer;
+    scene.pSceneObjectList.push_back(&sceneObject);
+    scene.pSceneObjectList.push_back(&floorObject);
     scene.cameraObject = &cameraObject;
+    scene.lightList.push_back({{0,  4,  -7},
+                               {60, 60, 60}});
 
-    sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_collapse.obj)");
-    sceneObject.scalingRatio = {3, 3, 3};
+    floorObject.geometryList = loadObj(floorObjectPath);
+    floorObject.scalingRatio = {3, 1, 3};
+    floorObject.rotationAxis = {0, 1, 0, 0};
+    floorObject.rotationDegree = 0;
+    floorObject.modelPos = {0, 0, 0, 1};
+    floorObject.vertexShader = Shader::emptyVertexShader;
+    floorObject.fragmentShader = Shader::blinnPhongFragmentShader;
+    floorObject.renderMode = DEFAULT;
+
+    sceneObject.geometryList = loadObj(sceneObjectPath);
+    sceneObject.scalingRatio = {1, 1, 1};
     sceneObject.rotationAxis = {0, 1, 0, 0};
     sceneObject.rotationDegree = 30;
-    sceneObject.modelPos = {0, 0, 0, 1};
-    cameraObject.pos = {0, 0, -15, 1};
+    sceneObject.modelPos = {0, 1, 0, 1};
+    sceneObject.vertexShader = Shader::emptyVertexShader;
+    sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
+    sceneObject.renderMode = DEFAULT;
+
+    cameraObject.pos = {0, 2, -18, 1};
     cameraObject.toward = {0, 0, 1, 0};
     cameraObject.top = {0, 1, 0, 0};
     cameraObject.FoV = 60;
     cameraObject.aspectRatio = 1;
     cameraObject.nearPaneZ = 0.1;
     cameraObject.farPaneZ = 50;
-    scene.lightList.push_back({{20,  0,   -20},
-                               {500, 500, 500}});
-    sceneObject.vertexShader = Shader::emptyVertexShader;
-    sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
-    sceneObject.renderMode = DEFAULT;
+
 
     std::string windowName = "Software Renderer";
     cvui::init(windowName);
     int toolbarWidth = 400;
     int padding = 10;
     ToolbarComponent toolbarComponent{toolbarWidth, padding};
-    cv::Mat frame = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height), CV_8UC3);
+    cv::Mat frame = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height + 60), CV_8UC3);
     cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
 
-    bool isRendering = false;
+    std::atomic<bool> isRendering(false);
+    std::thread renderThread;
     while (cv::getWindowProperty(windowName, cv::WINDOW_AUTOSIZE) >= 0) {
         frame = cv::Scalar(49, 52, 49);
 
@@ -90,6 +105,7 @@ int main() {
                                    cameraObject.top.y(),
                                    cameraObject.top.z(),
                                    "x:", "y:", "z:", !isRendering);
+            cameraObject.top.normalize();
             cvui::space(0);
 
             cvui::text("Camera Toward Axis");
@@ -97,6 +113,7 @@ int main() {
                                    cameraObject.toward.y(),
                                    cameraObject.toward.z(),
                                    "x:", "y:", "z:", !isRendering);
+            cameraObject.toward.normalize();
             cvui::space(0);
 
             cvui::text("Light 0 Position");
@@ -106,7 +123,7 @@ int main() {
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
-            cvui::text("Fragment Shader");
+            cvui::text("Object Fragment Shader");
             cvui::beginRow(toolbarWidth, -1, padding);
             {
                 auto
@@ -132,7 +149,7 @@ int main() {
             cvui::endRow();
             cvui::space(0);
 
-            cvui::text("Render Mode");
+            cvui::text("Object Render Mode");
             cvui::beginRow(toolbarWidth, -1, padding);
             {
                 bool enableDefaultMode = sceneObject.renderMode == DEFAULT;
@@ -150,16 +167,63 @@ int main() {
             cvui::endRow();
             cvui::space(0);
 
+
+            cvui::text("Floor Fragment Shader");
+            cvui::beginRow(toolbarWidth, -1, padding);
+            {
+                auto
+                pFragmentShader = floorObject.fragmentShader.target < void(*)
+                (const Shader::FragmentShaderPayload &) > ();
+
+                bool enableBlinnPhong = *pFragmentShader == Shader::blinnPhongFragmentShader;
+                enableBlinnPhong = cvui::checkbox("Blinn-Phong", &enableBlinnPhong);
+                if (!isRendering && enableBlinnPhong) {
+                    floorObject.fragmentShader = Shader::blinnPhongFragmentShader;
+                }
+
+                bool enableTexture = *pFragmentShader == Shader::textureFragmentShader;
+                enableTexture = cvui::checkbox("Texture", &enableTexture);
+                if (!isRendering && enableTexture) {
+                    floorObject.fragmentShader = Shader::textureFragmentShader;
+                }
+
+                if (!isRendering && !enableBlinnPhong && !enableTexture) {
+                    floorObject.fragmentShader = Shader::emptyFragmentShader;
+                }
+            }
+            cvui::endRow();
+            cvui::space(0);
+
+            cvui::text("Floor Render Mode");
+            cvui::beginRow(toolbarWidth, -1, padding);
+            {
+                bool enableDefaultMode = floorObject.renderMode == DEFAULT;
+                enableDefaultMode = cvui::checkbox("DEFAULT", &enableDefaultMode);
+                if (!isRendering && enableDefaultMode) {
+                    floorObject.renderMode = DEFAULT;
+                }
+
+                bool enableLineOnlyMode = floorObject.renderMode == LINE_ONLY;
+                enableLineOnlyMode = cvui::checkbox("LINE_ONLY", &enableLineOnlyMode);
+                if (!isRendering && enableLineOnlyMode) {
+                    floorObject.renderMode = LINE_ONLY;
+                }
+            }
+            cvui::endRow();
+            cvui::space(0);
+
+
             cvui::beginRow(toolbarWidth, -1, padding);
             {
                 if (cvui::button("Render")) {
-                    if (!isRendering) {
-                        isRendering = true;
-                        std::thread t([&]() -> void {
+                    bool expected = false;
+                    isRendering.compare_exchange_strong(expected, true);
+                    if (!expected) {
+                        renderThread = std::thread([&]() -> void {
                             scene.draw();
                             isRendering = false;
                         });
-                        t.detach();
+                        renderThread.detach();
                     }
                 }
                 if (cvui::button("Clean")) {
@@ -169,11 +233,12 @@ int main() {
                 }
                 if (cvui::button("Reload .obj File")) {
                     if (!isRendering) {
-                        sceneObject.geometryList = loadObj(R"(Resources/Models/Spot/spot_collapse.obj)");
+                        sceneObject.geometryList = loadObj(sceneObjectPath);
                     }
                 }
                 if (cvui::button("Exit")) {
-                    break;
+                    cv::destroyAllWindows();
+                    exit(0);
                 }
             }
             cvui::endRow();
@@ -195,25 +260,75 @@ int main() {
 
         cvui::imshow(windowName, frame);
 
-        int key = cv::waitKey(20);
+        int key = cv::waitKeyEx(20);
         if (key == 27) {
             break;
-        } else if (key == 'a' && !isRendering) {
-            isRendering = true;
-            cameraObject.pos.x() -= 0.5;
-            std::thread t([&]() -> void {
-                scene.draw();
-                isRendering = false;
-            });
-            t.detach();
-        } else if (key == 'd' && !isRendering) {
-            isRendering = true;
-            cameraObject.pos.x() += 0.5;
-            std::thread t([&]() -> void {
-                scene.draw();
-                isRendering = false;
-            });
-            t.detach();
+        } else if (key == 'a') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.moveRight(-0.5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
+        } else if (key == 'd') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.moveRight(0.5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
+        } else if (key == 'w') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.moveForward(0.5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
+        } else if (key == 's') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.moveForward(-0.5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
+        } else if (key == 'q') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.rotate(cameraObject.top, -5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
+        } else if (key == 'e') {
+            bool expected = false;
+            isRendering.compare_exchange_strong(expected, true);
+            if (!expected) {
+                cameraObject.rotate(cameraObject.top, 5);
+                renderThread = std::thread([&]() -> void {
+                    scene.draw();
+                    isRendering = false;
+                });
+                renderThread.detach();
+            }
         }
     }
 }
@@ -227,12 +342,14 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj) {
     std::cout << "meshes count = " << loader.LoadedMeshes.size() << std::endl;
     for (auto mesh: loader.LoadedMeshes) {
         std::cout << " vertices count = " << mesh.Vertices.size() << std::endl;
+        std::cout << " indices count = " << mesh.Indices.size() << std::endl;
         Primitive::Geometry geometry;
         geometry.material.ka = Eigen::Vector3f(mesh.MeshMaterial.Ka.X, mesh.MeshMaterial.Ka.Y, mesh.MeshMaterial.Ka.Z);
         geometry.material.kd = Eigen::Vector3f(mesh.MeshMaterial.Kd.X, mesh.MeshMaterial.Kd.Y, mesh.MeshMaterial.Kd.Z);
         geometry.material.ks = Eigen::Vector3f(mesh.MeshMaterial.Ks.X, mesh.MeshMaterial.Ks.Y, mesh.MeshMaterial.Ks.Z);
         geometry.material.ns = mesh.MeshMaterial.Ns;
-        geometry.material.diffuseTexture = Primitive::Texture(path + mesh.MeshMaterial.map_Kd);
+        if (!mesh.MeshMaterial.map_Kd.empty())
+            geometry.material.diffuseTexture = Primitive::Texture(path + mesh.MeshMaterial.map_Kd);
 
         geometry.mesh.vertexes.resize(mesh.Vertices.size());
         for (int i = 0; i < mesh.Vertices.size(); ++i) {

@@ -8,7 +8,7 @@ ScreenBuffer::ScreenBuffer(int width, int height) {
     this->width = width;
     this->height = height;
     frameBuffer.resize(width * height);
-    depthBuffer.resize(width * height, MAX_DEPTH);
+    depthBuffer.resize(width * height, 1.f);
 }
 
 int ScreenBuffer::getIndex(int x, int y) const {
@@ -18,7 +18,7 @@ int ScreenBuffer::getIndex(int x, int y) const {
 
 void ScreenBuffer::clearBuffer() {
     for (auto &pixel: frameBuffer) pixel.setZero();
-    std::fill(depthBuffer.begin(), depthBuffer.end(), MAX_DEPTH);
+    std::fill(depthBuffer.begin(), depthBuffer.end(), 1.f);
 }
 
 Eigen::Vector3f &ScreenBuffer::valueInFrameBuffer(int x, int y) {

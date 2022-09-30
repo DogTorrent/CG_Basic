@@ -50,10 +50,10 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
     }
 
     Rasterizer rasterizer(screenBuffer, material, payload.fragmentShader);
-    for (int indexesI = 0; indexesI < indexes.size(); indexesI += 3) {
+    for (int indexesI = 0; indexesI + 2 < indexes.size(); indexesI += 3) {
         if (!clipTriangle(indexesI)) continue;
 
-        std::array<Primitive::GPUVertex *, 3> triangleVertexes{&vertexes[indexes[indexesI + 0]],
+        std::array<Primitive::GPUVertex *, 3> triangleVertexes{&vertexes[indexes[indexesI]],
                                                                &vertexes[indexes[indexesI + 1]],
                                                                &vertexes[indexes[indexesI + 2]]};
         for (int i = 0; i < 3; ++i) {
@@ -71,17 +71,20 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
             // [-1, 1] => [0, width], [-1, 1] => [0, height], [-1, 1] => [0, MAX_DEPTH]
             vertex.screenSpacePos.x() = 0.5f * (float) screenBuffer.width * (vertex.ndcSpacePos.x() + 1.0f);
             vertex.screenSpacePos.y() = 0.5f * (float) screenBuffer.height * (vertex.ndcSpacePos.y() + 1.0f);
-            vertex.screenSpacePos.z() = 0.5f * (float) MAX_DEPTH * (vertex.ndcSpacePos.z() + 1.0f);
+            vertex.screenSpacePos.z() = (vertex.ndcSpacePos.z() - cameraObject.nearPaneZ) /
+                                        (cameraObject.farPaneZ - cameraObject.nearPaneZ);
+//            vertex.screenSpacePos.z() = (1.f / vertex.viewSpacePos.z() - 1.f / cameraObject.nearPaneZ) /
+//                                        (1.f / cameraObject.farPaneZ - 1.f / cameraObject.nearPaneZ);
         }
 
-        // ignore line/dot
-        if (abs((triangleVertexes[0]->screenSpacePos.head(2) - triangleVertexes[1]->screenSpacePos.head(2)).norm()) <
-            1e-5
-            || abs((triangleVertexes[1]->screenSpacePos.head(2) - triangleVertexes[2]->screenSpacePos.head(2)).norm()) <
-               1e-5
-            || abs((triangleVertexes[2]->screenSpacePos.head(2) - triangleVertexes[0]->screenSpacePos.head(2)).norm()) <
-               1e-5)
-            continue;
+//        // ignore line/dot
+//        if (abs((triangleVertexes[0]->screenSpacePos.head(2) - triangleVertexes[1]->screenSpacePos.head(2)).norm()) <
+//            1e-5
+//            || abs((triangleVertexes[1]->screenSpacePos.head(2) - triangleVertexes[2]->screenSpacePos.head(2)).norm()) <
+//               1e-5
+//            || abs((triangleVertexes[2]->screenSpacePos.head(2) - triangleVertexes[0]->screenSpacePos.head(2)).norm()) <
+//               1e-5)
+//            continue;
 
         RasterizerPayload rasterizerPayload{triangleVertexes, lightList};
         if (renderMode == DEFAULT) rasterizer.rasterizeTriangle(rasterizerPayload);
@@ -96,31 +99,69 @@ bool Renderer::clipTriangle(int indexesI) {
     verts.push_back(vertexes[indexes[indexesI + 2]]);
     std::deque<Eigen::Vector4f> paneCoeffs = {
             //near
-            {0,  0,  -1, 1},
-            //far
+            // w_pane = -z, w - w_pane = - w_pane + w = z + w >= 0 -> inside
             {0,  0,  1,  1},
+            //far
+            // w_pane = z, w - w_pane = - w_pane + w = -z + w >= 0 -> inside
+            {0,  0,  -1, 1},
             //left
-            {-1, 0,  0,  1},
-            //right
+            // w_pane = -x, w - w_pane = - w_pane + w = x + w >= 0 -> inside
             {1,  0,  0,  1},
+            //right
+            // w_pane = x, w - w_pane = - w_pane + w = -x + w >= 0 -> inside
+            {-1, 0,  0,  1},
             //bottom
-            {0,  -1, 0,  1},
-            //top
+            // w_pane = -y, w - w_pane = - w_pane + w = y + w >= 0 -> inside
             {0,  1,  0,  1},
+            //top
+            // w_pane = y, w - w_pane = - w_pane + w = -y + w >= 0 -> inside
+            {0,  -1, 0,  1},
     };
+
     bool allInside = true;
-    float offsetRange = 1e-5;
-    for (auto &paneCoeff: paneCoeffs) {
-        for (auto &currV: verts) {
-            if (currV.clipSpacePos.dot(paneCoeff) < -offsetRange) {
-                allInside = false;
-                break;
-            }
+    for (auto &currV: verts) {
+        if (currV.clipSpacePos.w()-1e-5f < 0) {
+            allInside = false;
+            break;
         }
-        if (!allInside) break;
+    }
+    if (allInside) {
+        for (auto &paneCoeff: paneCoeffs) {
+            for (auto &currV: verts) {
+                if (currV.clipSpacePos.dot(paneCoeff) < 0) {
+                    allInside = false;
+                    break;
+                }
+            }
+            if (!allInside) break;
+        }
     }
     if (allInside) return true;
 
+    // clip for w_pane = 1e-5f
+    {
+        std::deque<Primitive::GPUVertex> newVerts;
+        Primitive::GPUVertex *preV = nullptr;
+        Primitive::GPUVertex *currV = &(verts.back());
+        float preD;
+        float currD = currV->clipSpacePos.w() - 1e-5f;
+        for (auto &vert: verts) {
+            preV = currV;
+            preD = currD;
+            currV = &vert;
+            currD = currV->clipSpacePos.w() - 1e-5f;
+            if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
+                newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
+            }
+            if (currD >= 0) {
+                newVerts.push_back(*currV);
+            }
+        }
+        if (newVerts.size() < 3) return false;
+        verts = newVerts;
+    }
+
+    // clip for w_pane = near/far/left/right/bottom/top
     for (auto &paneCoeff: paneCoeffs) {
         std::deque<Primitive::GPUVertex> newVerts;
         Primitive::GPUVertex *preV = nullptr;
@@ -132,14 +173,14 @@ bool Renderer::clipTriangle(int indexesI) {
             preD = currD;
             currV = &vert;
             currD = currV->clipSpacePos.dot(paneCoeff);
-            if ((preD >= offsetRange && currD < -offsetRange) || (preD < -offsetRange && currD >= offsetRange)) {
-                newVerts.emplace_back(lineLerp(*preV, *currV, preD / (preD - currD)));
+            if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
+                newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
             }
-            if (currD >= offsetRange) {
+            if (currD >= 0) {
                 newVerts.push_back(*currV);
             }
         }
-        if (newVerts.empty() || newVerts.size() < 3) return false;
+        if (newVerts.size() < 3) return false;
         verts = newVerts;
     }
 
@@ -165,16 +206,16 @@ bool Renderer::clipTriangle(int indexesI) {
 
 template<typename T>
 T Renderer::lineLerp(T &a1, T &a2, float weight) {
-    return weight * a2 + (1 - weight) * a1;
+    return (1 - weight) * a1 + weight * a2;
 }
 
 Primitive::GPUVertex Renderer::lineLerp(Primitive::GPUVertex &a1, Primitive::GPUVertex &a2, float weight) {
     Primitive::GPUVertex newV;
     newV.pos = lineLerp(a1.pos, a2.pos, weight);
-    newV.clipSpacePos = lineLerp(a1.clipSpacePos, a2.clipSpacePos, weight);
     newV.viewSpacePos = lineLerp(a1.viewSpacePos, a2.viewSpacePos, weight);
+    newV.clipSpacePos = lineLerp(a1.clipSpacePos, a2.clipSpacePos, weight);
     newV.uv = lineLerp(a1.uv, a2.uv, weight);
     newV.color = lineLerp(a1.color, a2.color, weight);
-    newV.normal = lineLerp(a1.normal, a2.normal, weight);
+    newV.normal = lineLerp(a1.normal, a2.normal, weight).normalized();
     return newV;
 }
