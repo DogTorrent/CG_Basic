@@ -48,11 +48,19 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
     for (auto &vertex: vertexes) {
         // apply mvp transformation
         Shader::basicVertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
+
+        // apply vertex shader
+        payload.vertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
     }
 
-    // clip
     std::queue<int> disabledTriangleIndexI;
     for (int indexesI = 0; indexesI + 2 < indexes.size(); indexesI += 3) {
+        // cull
+        if (renderOption.culling != RenderOption::CULL_NONE && !cullTriangle(indexesI)) {
+            disabledTriangleIndexI.push(indexesI);
+            continue;
+        }
+        // clip
         if (!clipTriangle(indexesI)) {
             disabledTriangleIndexI.push(indexesI);
             continue;
@@ -61,9 +69,6 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
 
     for (auto &vertex: vertexes) {
         if (!vertex.enabled) continue;
-
-        // apply vertex shader
-        payload.vertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
 
         // Homogeneous division
         // clip_space -> ndc_space
@@ -90,8 +95,10 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
                                                                &vertexes[indexes[indexesI + 2]]};
         RasterizerPayload rasterizerPayload{triangleVertexes, lightList};
 
-        if (renderMode == DEFAULT) rasterizer.rasterizeTriangle(rasterizerPayload);
-        else if (renderMode == LINE_ONLY) rasterizer.rasterizeTriangleLine(rasterizerPayload);
+        if (renderOption.renderMode == RenderOption::MODE_DEFAULT)
+            rasterizer.rasterizeTriangle(rasterizerPayload);
+        else if (renderOption.renderMode == RenderOption::MODE_LINE_ONLY)
+            rasterizer.rasterizeTriangleLine(rasterizerPayload);
     }
 }
 
@@ -183,6 +190,23 @@ bool Renderer::clipTriangle(int indexesI) {
         indexes.push_back(index2);
     }
     return false;
+}
+
+/**
+ * cull triangle
+ * @param indexesI the index of the first vert of the triangle in the `indexes` array
+ * @return should render such triangle or not
+ */
+bool Renderer::cullTriangle(int indexesI) {
+    Eigen::Vector3f v1 = vertexes[indexes[indexesI + 1]].viewSpacePos.head(3) * 10 -
+                         vertexes[indexes[indexesI]].viewSpacePos.head(3) * 10;
+    Eigen::Vector3f v2 = vertexes[indexes[indexesI + 2]].viewSpacePos.head(3) * 10 -
+                         vertexes[indexes[indexesI]].viewSpacePos.head(3) * 10;
+    Eigen::Vector3f normal = v2.cross(v1);
+    Eigen::Vector3f toCam = -vertexes[indexes[indexesI]].viewSpacePos.head(3);
+    if (renderOption.culling == RenderOption::CULL_BACK) return normal.dot(toCam) >= 0;
+    else if (renderOption.culling == RenderOption::CULL_FRONT) return normal.dot(toCam) <= 0;
+    return true;
 }
 
 template<typename T>

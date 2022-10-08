@@ -9,7 +9,7 @@
 #include <eigen3/Eigen/Core>
 #include "Primitive.h"
 #include "Shader.h"
-#include "Statics.h"
+#include "Renderer.h"
 
 class SceneObject {
 public:
@@ -20,7 +20,7 @@ public:
     Eigen::Vector4f modelPos;
     std::function<void(const Shader::VertexShaderPayload &)> vertexShader;
     std::function<void(const Shader::FragmentShaderPayload &)> fragmentShader;
-    RenderMode renderMode = DEFAULT;
+    RenderOption renderOption;
 };
 
 class CameraObject {

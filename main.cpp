@@ -24,7 +24,9 @@ int main() {
     scene.pSceneObjectList.push_back(&sceneObject);
     scene.pSceneObjectList.push_back(&floorObject);
     scene.cameraObject = &cameraObject;
-    scene.lightList.push_back({{0,  2,  -7},
+    scene.lightList.push_back({{-7, 4,  -4},
+                               {60, 60, 60}});
+    scene.lightList.push_back({{7,  4,  -4},
                                {60, 60, 60}});
 
     floorObject.geometryList = loadObj(floorObjectPath);
@@ -34,16 +36,14 @@ int main() {
     floorObject.modelPos = {0, 0, 0, 1};
     floorObject.vertexShader = Shader::emptyVertexShader;
     floorObject.fragmentShader = Shader::blinnPhongFragmentShader;
-    floorObject.renderMode = DEFAULT;
 
     sceneObject.geometryList = loadObj(sceneObjectPath);
     sceneObject.scalingRatio = {1, 1, 1};
     sceneObject.rotationAxis = {0, 1, 0, 0};
     sceneObject.rotationDegree = 30;
-    sceneObject.modelPos = {0, 2, 0, 1};
+    sceneObject.modelPos = {0, 1, 0, 1};
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
-    sceneObject.renderMode = DEFAULT;
 
     cameraObject.pos = {0, 2, -18, 1};
     cameraObject.toward = {0, 0, 1, 0};
@@ -78,51 +78,6 @@ int main() {
                                    "x:", "y:", "z:", !isRendering);
             cvui::space(0);
 
-            cvui::text("Object Scaling");
-            toolbarComponent.f3Row(sceneObject.scalingRatio.x(),
-                                   sceneObject.scalingRatio.y(),
-                                   sceneObject.scalingRatio.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Object Rotation");
-            toolbarComponent.f3Row(sceneObject.rotationAxis.x(),
-                                   sceneObject.rotationAxis.y(),
-                                   sceneObject.rotationAxis.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            toolbarComponent.f1Row(sceneObject.rotationDegree, "degree:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Camera Position");
-            toolbarComponent.f3Row(cameraObject.pos.x(),
-                                   cameraObject.pos.y(),
-                                   cameraObject.pos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Camera Top Axis");
-            toolbarComponent.f3Row(cameraObject.top.x(),
-                                   cameraObject.top.y(),
-                                   cameraObject.top.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cameraObject.top.normalize();
-            cvui::space(0);
-
-            cvui::text("Camera Toward Axis");
-            toolbarComponent.f3Row(cameraObject.toward.x(),
-                                   cameraObject.toward.y(),
-                                   cameraObject.toward.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cameraObject.toward.normalize();
-            cvui::space(0);
-
-            cvui::text("Light 0 Position");
-            toolbarComponent.f3Row(scene.lightList[0].pos.x(),
-                                   scene.lightList[0].pos.y(),
-                                   scene.lightList[0].pos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
             cvui::text("Object Fragment Shader");
             cvui::beginRow(toolbarWidth, -1, padding);
             {
@@ -150,23 +105,28 @@ int main() {
             cvui::space(0);
 
             cvui::text("Object Render Mode");
-            cvui::beginRow(toolbarWidth, -1, padding);
-            {
-                bool enableDefaultMode = sceneObject.renderMode == DEFAULT;
-                enableDefaultMode = cvui::checkbox("DEFAULT", &enableDefaultMode);
-                if (!isRendering && enableDefaultMode) {
-                    sceneObject.renderMode = DEFAULT;
-                }
-
-                bool enableLineOnlyMode = sceneObject.renderMode == LINE_ONLY;
-                enableLineOnlyMode = cvui::checkbox("LINE_ONLY", &enableLineOnlyMode);
-                if (!isRendering && enableLineOnlyMode) {
-                    sceneObject.renderMode = LINE_ONLY;
-                }
-            }
-            cvui::endRow();
+            toolbarComponent.checkBoxes<RenderOption::RenderMode, 2>(sceneObject.renderOption.renderMode,
+                                                                     {RenderOption::MODE_DEFAULT,
+                                                                      RenderOption::MODE_LINE_ONLY},
+                                                                     {"MODE_DEFAULT", "MODE_LINE_ONLY"},
+                                                                     !isRendering);
             cvui::space(0);
 
+            cvui::text("Object Culling Mode");
+            toolbarComponent.checkBoxes<RenderOption::Culling, 3>(sceneObject.renderOption.culling,
+                                                                  {RenderOption::CULL_BACK,
+                                                                   RenderOption::CULL_FRONT,
+                                                                   RenderOption::CULL_NONE},
+                                                                  {"CULL_BACK", "CULL_FRONT", "CULL_NONE"},
+                                                                  !isRendering);
+            cvui::space(0);
+
+            cvui::text("Floor Position");
+            toolbarComponent.f3Row(floorObject.modelPos.x(),
+                                   floorObject.modelPos.y(),
+                                   floorObject.modelPos.z(),
+                                   "x:", "y:", "z:", !isRendering);
+            cvui::space(0);
 
             cvui::text("Floor Fragment Shader");
             cvui::beginRow(toolbarWidth, -1, padding);
@@ -195,23 +155,42 @@ int main() {
             cvui::space(0);
 
             cvui::text("Floor Render Mode");
-            cvui::beginRow(toolbarWidth, -1, padding);
-            {
-                bool enableDefaultMode = floorObject.renderMode == DEFAULT;
-                enableDefaultMode = cvui::checkbox("DEFAULT", &enableDefaultMode);
-                if (!isRendering && enableDefaultMode) {
-                    floorObject.renderMode = DEFAULT;
-                }
-
-                bool enableLineOnlyMode = floorObject.renderMode == LINE_ONLY;
-                enableLineOnlyMode = cvui::checkbox("LINE_ONLY", &enableLineOnlyMode);
-                if (!isRendering && enableLineOnlyMode) {
-                    floorObject.renderMode = LINE_ONLY;
-                }
-            }
-            cvui::endRow();
+            toolbarComponent.checkBoxes<RenderOption::RenderMode, 2>(floorObject.renderOption.renderMode,
+                                                                     {RenderOption::MODE_DEFAULT,
+                                                                      RenderOption::MODE_LINE_ONLY},
+                                                                     {"MODE_DEFAULT", "MODE_LINE_ONLY"},
+                                                                     !isRendering);
             cvui::space(0);
 
+            cvui::text("Floor Culling Mode");
+            toolbarComponent.checkBoxes<RenderOption::Culling, 3>(floorObject.renderOption.culling,
+                                                                  {RenderOption::CULL_BACK,
+                                                                   RenderOption::CULL_FRONT,
+                                                                   RenderOption::CULL_NONE},
+                                                                  {"CULL_BACK", "CULL_FRONT", "CULL_NONE"},
+                                                                  !isRendering);
+            cvui::space(0);
+
+            cvui::text("Camera Position");
+            toolbarComponent.f3Row(cameraObject.pos.x(),
+                                   cameraObject.pos.y(),
+                                   cameraObject.pos.z(),
+                                   "x:", "y:", "z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Light 0 Position");
+            toolbarComponent.f3Row(scene.lightList[0].pos.x(),
+                                   scene.lightList[0].pos.y(),
+                                   scene.lightList[0].pos.z(),
+                                   "x:", "y:", "z:", !isRendering);
+            cvui::space(0);
+
+            cvui::text("Light 1 Position");
+            toolbarComponent.f3Row(scene.lightList[1].pos.x(),
+                                   scene.lightList[1].pos.y(),
+                                   scene.lightList[1].pos.z(),
+                                   "x:", "y:", "z:", !isRendering);
+            cvui::space(0);
 
             cvui::beginRow(toolbarWidth, -1, padding);
             {

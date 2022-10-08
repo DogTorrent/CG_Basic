@@ -21,6 +21,22 @@ public:
     void f3Row(float &dest1, float &dest2, float &dest3,
                const std::string &labelName1, const std::string &labelName2, const std::string &labelName3,
                bool enabled = true);
+
+    template<typename T, int size>
+    void checkBoxes(T &dest, const std::array<T, size> &candidates,
+                    const std::array<std::string, size> &names, bool enabled = true) {
+        cvui::beginRow(toolbarWidth, -1, padding);
+        {
+            for (int i = 0; i < size; ++i) {
+                bool enableOption = dest == candidates[i];
+                enableOption = cvui::checkbox(names[i], &enableOption);
+                if (enabled && enableOption) {
+                    dest = candidates[i];
+                }
+            }
+        }
+        cvui::endRow();
+    }
 };
 
 

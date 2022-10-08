@@ -25,7 +25,7 @@ void Scene::draw() {
                 TransformMatrix::getScalingMatrix(pSceneObject->scalingRatio),
                 TransformMatrix::getRotationMatrix(pSceneObject->rotationAxis, pSceneObject->rotationDegree),
                 TransformMatrix::getMovingMatrix(pSceneObject->modelPos));
-        renderer.renderMode = pSceneObject->renderMode;
+        renderer.renderOption = pSceneObject->renderOption;
 
         for (auto &geometry: pSceneObject->geometryList) {
             RendererPayload rendererPayload{geometry, pSceneObject->vertexShader, pSceneObject->fragmentShader,

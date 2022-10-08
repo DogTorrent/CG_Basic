@@ -10,11 +10,21 @@
 #include <eigen3/Eigen/Eigen>
 #include "Primitive.h"
 #include "Shader.h"
-#include "Statics.h"
 
 class ScreenBuffer;
 
 class CameraObject;
+
+struct RenderOption {
+    bool zWrite = true;
+    bool zTest = true;
+    enum Culling {
+        CULL_FRONT, CULL_BACK, CULL_NONE
+    } culling = CULL_BACK;
+    enum RenderMode {
+        MODE_DEFAULT, MODE_LINE_ONLY
+    } renderMode = MODE_DEFAULT;
+};
 
 struct RendererPayload {
     Primitive::Geometry &geometry;
@@ -33,7 +43,7 @@ public:
     Eigen::Matrix4f viewMatrix;
     Eigen::Matrix4f projectionMatrix;
     std::deque<Primitive::Light> lightList;
-    RenderMode renderMode = DEFAULT;
+    RenderOption renderOption;
 
     Renderer(ScreenBuffer &screenBuffer, CameraObject &cameraObject);
 
@@ -41,10 +51,12 @@ public:
 
     bool clipTriangle(int indexesI);
 
+    bool cullTriangle(int indexesI);
+
     void transformLights();
 
     template<typename T>
-    T lineLerp(T &a1,T &a2, float weight);
+    T lineLerp(T &a1, T &a2, float weight);
 
     Primitive::GPUVertex lineLerp(Primitive::GPUVertex &a1, Primitive::GPUVertex &a2, float weight);
 };

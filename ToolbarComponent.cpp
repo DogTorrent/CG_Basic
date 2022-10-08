@@ -56,4 +56,3 @@ void ToolbarComponent::f3Row(float &dest1, float &dest2, float &dest3,
     }
     cvui::endRow();
 }
-
