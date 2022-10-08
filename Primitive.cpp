@@ -49,7 +49,5 @@ Primitive::GPUVertex::GPUVertex(const Primitive::Vertex &vertex) {
 
 Primitive::GPUVertex::GPUVertex(const Primitive::GPUVertex &vertex) : Vertex(vertex) {
     viewSpacePos = vertex.viewSpacePos;
-    clipSpacePos = vertex.clipSpacePos;
-    ndcSpacePos = vertex.ndcSpacePos;
-    screenSpacePos = vertex.screenSpacePos;
+    enabled = vertex.enabled;
 }

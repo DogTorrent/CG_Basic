@@ -13,7 +13,7 @@ namespace Shader {
 
         // projection transform
         // view_space -> clip_space
-        payload.vertex.clipSpacePos = payload.projectionMatrix * payload.vertex.viewSpacePos;
+        payload.vertex.pos = payload.projectionMatrix * payload.vertex.viewSpacePos;
     };
 
     void emptyVertexShader(const VertexShaderPayload &payload) {

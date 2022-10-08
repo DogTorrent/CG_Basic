@@ -14,7 +14,7 @@ void Rasterizer::rasterizeTriangle(const RasterizerPayload &payload) {
     std::vector<Eigen::Vector2f> scanTrianglePos;
     scanTrianglePos.reserve(3);
     for (auto item: payload.triangleVertexes) {
-        scanTrianglePos.emplace_back(item->screenSpacePos.x(), item->screenSpacePos.y());
+        scanTrianglePos.emplace_back(item->pos.x(), item->pos.y());
     }
     std::sort(scanTrianglePos.begin(), scanTrianglePos.end(),
               [](Eigen::Vector2f &a, Eigen::Vector2f &b) -> bool {
@@ -92,10 +92,10 @@ void Rasterizer::rasterizeTriangle(const RasterizerPayload &payload) {
 
 void Rasterizer::rasterizeTriangleLine(const RasterizerPayload &payload) {
     for (int i = 0; i < 3; ++i) {
-        Eigen::Vector2f p1(payload.triangleVertexes[i]->screenSpacePos.x(),
-                           payload.triangleVertexes[i]->screenSpacePos.y());
-        Eigen::Vector2f p2(payload.triangleVertexes[(i + 1) % 3]->screenSpacePos.x(),
-                           payload.triangleVertexes[(i + 1) % 3]->screenSpacePos.y());
+        Eigen::Vector2f p1(payload.triangleVertexes[i]->pos.x(),
+                           payload.triangleVertexes[i]->pos.y());
+        Eigen::Vector2f p2(payload.triangleVertexes[(i + 1) % 3]->pos.x(),
+                           payload.triangleVertexes[(i + 1) % 3]->pos.y());
         float deltaY = p2.y() - p1.y();
         float deltaX = p2.x() - p1.x();
         bool isKLessThanOne = abs(deltaY) < abs(deltaX);
@@ -144,9 +144,9 @@ bool Rasterizer::checkInsideTriangle(float posX, float posY, std::array<Primitiv
     std::array<Eigen::Vector3f, 3> vec_p;
     std::array<float, 3> crossZ{};
     for (int i = 0; i < 3; ++i) {
-        vec[i] = {triangleVertexes[i]->screenSpacePos.x() - posX, triangleVertexes[i]->screenSpacePos.y() - posY, 0};
-        vec_p[i] = {triangleVertexes[i]->screenSpacePos.x() - triangleVertexes[(i + 1) % 3]->screenSpacePos.x(),
-                    triangleVertexes[i]->screenSpacePos.y() - triangleVertexes[(i + 1) % 3]->screenSpacePos.y(), 0};
+        vec[i] = {triangleVertexes[i]->pos.x() - posX, triangleVertexes[i]->pos.y() - posY, 0};
+        vec_p[i] = {triangleVertexes[i]->pos.x() - triangleVertexes[(i + 1) % 3]->pos.x(),
+                    triangleVertexes[i]->pos.y() - triangleVertexes[(i + 1) % 3]->pos.y(), 0};
         crossZ[i] = vec[i].cross(vec_p[i]).z();
     }
     if ((crossZ[0] >= 0 && crossZ[1] >= 0 && crossZ[2] >= 0) ||
@@ -157,12 +157,12 @@ bool Rasterizer::checkInsideTriangle(float posX, float posY, std::array<Primitiv
 
 std::array<float, 3>
 Rasterizer::getBarycentricCoordinates(float x, float y, std::array<Primitive::GPUVertex *, 3> &triangleVertexes) {
-    Eigen::Vector2f AminusB = (triangleVertexes[0]->screenSpacePos - triangleVertexes[1]->screenSpacePos).head(2);
-    Eigen::Vector2f BminusC = (triangleVertexes[1]->screenSpacePos - triangleVertexes[2]->screenSpacePos).head(2);
-    Eigen::Vector2f CminusA = (triangleVertexes[2]->screenSpacePos - triangleVertexes[0]->screenSpacePos).head(2);
-    Eigen::Vector2f PminusA = Eigen::Vector2f(x, y) - triangleVertexes[0]->screenSpacePos.head(2);
-    Eigen::Vector2f PminusB = Eigen::Vector2f(x, y) - triangleVertexes[1]->screenSpacePos.head(2);
-    Eigen::Vector2f PminusC = Eigen::Vector2f(x, y) - triangleVertexes[2]->screenSpacePos.head(2);
+    Eigen::Vector2f AminusB = (triangleVertexes[0]->pos - triangleVertexes[1]->pos).head(2);
+    Eigen::Vector2f BminusC = (triangleVertexes[1]->pos - triangleVertexes[2]->pos).head(2);
+    Eigen::Vector2f CminusA = (triangleVertexes[2]->pos - triangleVertexes[0]->pos).head(2);
+    Eigen::Vector2f PminusA = Eigen::Vector2f(x, y) - triangleVertexes[0]->pos.head(2);
+    Eigen::Vector2f PminusB = Eigen::Vector2f(x, y) - triangleVertexes[1]->pos.head(2);
+    Eigen::Vector2f PminusC = Eigen::Vector2f(x, y) - triangleVertexes[2]->pos.head(2);
     float alpha, beta, gamma;
     alpha = (PminusB.x() * BminusC.y() - PminusB.y() * BminusC.x())
             / (AminusB.x() * BminusC.y() - AminusB.y() * BminusC.x());
@@ -177,13 +177,13 @@ Rasterizer::convertBarycentricCoordinates(float screenSpaceAlpha, float screenSp
                                           std::array<Primitive::GPUVertex *, 3> &triangleVertexes) {
 
     // correct z
-    float viewSpaceZ = 1 / (screenSpaceAlpha / triangleVertexes[0]->viewSpacePos.z()
-                            + screenSpaceBeta / triangleVertexes[1]->viewSpacePos.z()
-                            + screenSpaceGamma / triangleVertexes[2]->viewSpacePos.z());
+    float viewSpaceZ = 1 / (screenSpaceAlpha / triangleVertexes[0]->pos.w()
+                            + screenSpaceBeta / triangleVertexes[1]->pos.w()
+                            + screenSpaceGamma / triangleVertexes[2]->pos.w());
     // convert barycentric coordinates to view space
-    float viewSpaceAlpha = screenSpaceAlpha * viewSpaceZ / triangleVertexes[0]->viewSpacePos.z();
-    float viewSpaceBeta = screenSpaceBeta * viewSpaceZ / triangleVertexes[1]->viewSpacePos.z();
-    float viewSpaceGamma = screenSpaceGamma * viewSpaceZ / triangleVertexes[2]->viewSpacePos.z();
+    float viewSpaceAlpha = screenSpaceAlpha * viewSpaceZ / triangleVertexes[0]->pos.w();
+    float viewSpaceBeta = screenSpaceBeta * viewSpaceZ / triangleVertexes[1]->pos.w();
+    float viewSpaceGamma = screenSpaceGamma * viewSpaceZ / triangleVertexes[2]->pos.w();
     return {viewSpaceAlpha, viewSpaceBeta, viewSpaceGamma};
 }
 
@@ -205,9 +205,9 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
                                             payload.triangleVertexes);
 
     // interpolate z
-    pointScreenSpacePos.z() = viewSpaceAlpha * payload.triangleVertexes[0]->screenSpacePos.z()
-                              + viewSpaceBeta * payload.triangleVertexes[1]->screenSpacePos.z()
-                              + viewSpaceGamma * payload.triangleVertexes[2]->screenSpacePos.z();
+    pointScreenSpacePos.z() = viewSpaceAlpha * payload.triangleVertexes[0]->pos.z()
+                              + viewSpaceBeta * payload.triangleVertexes[1]->pos.z()
+                              + viewSpaceGamma * payload.triangleVertexes[2]->pos.z();
 
     // clip out of range
     if (pointScreenSpacePos.z() < 0) return;

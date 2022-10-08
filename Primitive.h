@@ -30,9 +30,7 @@ namespace Primitive {
     class GPUVertex : public Vertex {
     public:
         Eigen::Vector4f viewSpacePos;
-        Eigen::Vector4f clipSpacePos;
-        Eigen::Vector4f ndcSpacePos;
-        Eigen::Vector3f screenSpacePos;
+        bool enabled = true;
 
         explicit GPUVertex(const Vertex &vertex);
         GPUVertex(const GPUVertex &vertex);
