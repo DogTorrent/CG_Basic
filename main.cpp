@@ -50,7 +50,7 @@ int main() {
     cameraObject.top = {0, 1, 0, 0};
     cameraObject.FoV = 60;
     cameraObject.aspectRatio = 1;
-    cameraObject.nearPaneZ = 0.01;
+    cameraObject.nearPaneZ = 0.25;
     cameraObject.farPaneZ = 100;
 
 

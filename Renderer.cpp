@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <queue>
 #include "Renderer.h"
 #include "Rasterizer.h"
 #include "ScreenBuffer.h"
@@ -49,9 +50,22 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
         Shader::basicVertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
     }
 
-    Rasterizer rasterizer(screenBuffer, material, payload.fragmentShader);
+    // clip
+    std::queue<int> disabledTriangleIndexI;
     for (int indexesI = 0; indexesI + 2 < indexes.size(); indexesI += 3) {
-        if (!clipTriangle(indexesI)) continue;
+        if (!clipTriangle(indexesI)) {
+            disabledTriangleIndexI.push(indexesI);
+            continue;
+        }
+    }
+
+    Rasterizer rasterizer(screenBuffer, material, payload.fragmentShader);
+
+    for (int indexesI = 0; indexesI + 2 < indexes.size(); indexesI += 3) {
+        if (!disabledTriangleIndexI.empty() && indexesI == disabledTriangleIndexI.front()) {
+            disabledTriangleIndexI.pop();
+            continue;
+        }
 
         std::array<Primitive::GPUVertex *, 3> triangleVertexes{&vertexes[indexes[indexesI]],
                                                                &vertexes[indexes[indexesI + 1]],
@@ -73,18 +87,7 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
             vertex.screenSpacePos.y() = 0.5f * (float) screenBuffer.height * (vertex.ndcSpacePos.y() + 1.0f);
             vertex.screenSpacePos.z() = (vertex.ndcSpacePos.z() - cameraObject.nearPaneZ) /
                                         (cameraObject.farPaneZ - cameraObject.nearPaneZ);
-//            vertex.screenSpacePos.z() = (1.f / vertex.viewSpacePos.z() - 1.f / cameraObject.nearPaneZ) /
-//                                        (1.f / cameraObject.farPaneZ - 1.f / cameraObject.nearPaneZ);
         }
-
-//        // ignore line/dot
-//        if (abs((triangleVertexes[0]->screenSpacePos.head(2) - triangleVertexes[1]->screenSpacePos.head(2)).norm()) <
-//            1e-5
-//            || abs((triangleVertexes[1]->screenSpacePos.head(2) - triangleVertexes[2]->screenSpacePos.head(2)).norm()) <
-//               1e-5
-//            || abs((triangleVertexes[2]->screenSpacePos.head(2) - triangleVertexes[0]->screenSpacePos.head(2)).norm()) <
-//               1e-5)
-//            continue;
 
         RasterizerPayload rasterizerPayload{triangleVertexes, lightList};
         if (renderMode == DEFAULT) rasterizer.rasterizeTriangle(rasterizerPayload);
@@ -119,49 +122,16 @@ bool Renderer::clipTriangle(int indexesI) {
     };
 
     bool allInside = true;
-    for (auto &currV: verts) {
-        if (currV.clipSpacePos.w() - 1e-5f < 0) {
-            allInside = false;
-            break;
-        }
-    }
-    if (allInside) {
-        for (auto &paneCoeff: paneCoeffs) {
-            for (auto &currV: verts) {
-                if (currV.clipSpacePos.dot(paneCoeff) < 0) {
-                    allInside = false;
-                    break;
-                }
+    for (auto &paneCoeff: paneCoeffs) {
+        for (auto &currV: verts) {
+            if (currV.clipSpacePos.dot(paneCoeff) < 0) {
+                allInside = false;
+                break;
             }
-            if (!allInside) break;
         }
+        if (!allInside) break;
     }
     if (allInside) return true;
-
-    // clip for w_pane = 1e-5f
-    {
-        std::deque<Primitive::GPUVertex> newVerts;
-        Primitive::GPUVertex *preV = nullptr;
-        Primitive::GPUVertex *currV = &(verts.back());
-        float preD;
-        float currD = currV->clipSpacePos.w() - 1e-5f;
-        for (auto &vert: verts) {
-            preV = currV;
-            preD = currD;
-            currV = &vert;
-            currD = currV->clipSpacePos.w() - 1e-5f;
-            if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
-                newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
-                // Manually set the w value to avoid interpolated wi != -w, which may cause infinite loops
-                newVerts.back().clipSpacePos.w() = -1e-5f;
-            }
-            if (currD >= 0) {
-                newVerts.push_back(*currV);
-            }
-        }
-        if (newVerts.size() < 3) return false;
-        verts = newVerts;
-    }
 
     // clip for w_pane = near/far/left/right/bottom/top
     for (auto &paneCoeff: paneCoeffs) {
@@ -175,7 +145,7 @@ bool Renderer::clipTriangle(int indexesI) {
             preD = currD;
             currV = &vert;
             currD = currV->clipSpacePos.dot(paneCoeff);
-            if ((preD > 0 && currD < 0) || (preD < 0 && currD > 0)) {
+            if ((preD >= 0 && currD < 0) || (preD < 0 && currD >= 0)) {
                 newVerts.emplace_back(lineLerp(*preV, *currV, abs(preD) / (abs(preD) + abs(currD))));
                 // Manually set the w value to avoid interpolated wi != -w, which may cause infinite loops
                 newVerts.back().clipSpacePos.w() = -newVerts.back().clipSpacePos.head(3).dot(paneCoeff.head(3));
