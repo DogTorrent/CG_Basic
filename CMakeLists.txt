@@ -3,6 +3,6 @@ project(CG_Basic)
 find_package(OpenCV CONFIG REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(CG_Basic main.cpp TransformMatrix.cpp TransformMatrix.h Renderer.cpp Renderer.h Shader.cpp Shader.h Primitive.cpp Primitive.h ThirdParty/OBJ_Loader.h Rasterizer.cpp Rasterizer.h ScreenBuffer.cpp ScreenBuffer.h Scene.cpp Scene.h ToolbarComponent.cpp ToolbarComponent.h Object.cpp Object.h Statics.h)
+add_executable(CG_Basic main.cpp TransformMatrix.cpp TransformMatrix.h Renderer.cpp Renderer.h Shader.cpp Shader.h Primitive.cpp Primitive.h ThirdParty/OBJ_Loader.h Rasterizer.cpp Rasterizer.h ScreenBuffer.cpp ScreenBuffer.h Scene.cpp Scene.h ToolbarComponent.cpp ToolbarComponent.h Object.cpp Object.h)
 target_link_libraries(CG_Basic ${OpenCV_LIBRARIES})
 file(COPY Resources DESTINATION ./)
