@@ -15,7 +15,7 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
 
 int main() {
     std::string sceneObjectPath = R"(Resources/Models/Spot/spot_triangulated_mod.obj)";
-    std::string floorObjectPath = R"(Resources/Models/Spot/floor.obj)";
+    std::string floorObjectPath = R"(Resources/Models/Flat/floor_mod.obj)";
     Scene scene;
     ScreenBuffer screenBuffer(700, 700);
     SceneObject sceneObject, floorObject;
@@ -24,11 +24,11 @@ int main() {
     scene.pSceneObjectList.push_back(&sceneObject);
     scene.pSceneObjectList.push_back(&floorObject);
     scene.cameraObject = &cameraObject;
-    scene.lightList.push_back({{0,  4,  -7},
+    scene.lightList.push_back({{0,  2,  -7},
                                {60, 60, 60}});
 
     floorObject.geometryList = loadObj(floorObjectPath);
-    floorObject.scalingRatio = {3, 1, 3};
+    floorObject.scalingRatio = {1, 1, 1};
     floorObject.rotationAxis = {0, 1, 0, 0};
     floorObject.rotationDegree = 0;
     floorObject.modelPos = {0, 0, 0, 1};
@@ -40,7 +40,7 @@ int main() {
     sceneObject.scalingRatio = {1, 1, 1};
     sceneObject.rotationAxis = {0, 1, 0, 0};
     sceneObject.rotationDegree = 30;
-    sceneObject.modelPos = {0, 1, 0, 1};
+    sceneObject.modelPos = {0, 2, 0, 1};
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
     sceneObject.renderMode = DEFAULT;
@@ -50,8 +50,8 @@ int main() {
     cameraObject.top = {0, 1, 0, 0};
     cameraObject.FoV = 60;
     cameraObject.aspectRatio = 1;
-    cameraObject.nearPaneZ = 0.1;
-    cameraObject.farPaneZ = 50;
+    cameraObject.nearPaneZ = 0.01;
+    cameraObject.farPaneZ = 100;
 
 
     std::string windowName = "Software Renderer";

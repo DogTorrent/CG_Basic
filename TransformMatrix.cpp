@@ -47,7 +47,7 @@ TransformMatrix::getViewMatrix(const Eigen::Vector4f &cameraPos, const Eigen::Ve
 
 Eigen::Matrix4f TransformMatrix::getProjectionMatrix(float FoV, float aspectRatio, float near, float far) {
     // top and right in the near pane
-    auto top = near * (float) tan(FoV / 2 / 180 * EIGEN_PI);
+    auto top = near * (float) tan(FoV / 2.f / 180.f * EIGEN_PI);
     float right = top * aspectRatio;
     // z-pane:
     // point => persp:
@@ -70,7 +70,7 @@ Eigen::Matrix4f TransformMatrix::getProjectionMatrix(float FoV, float aspectRati
     Eigen::Matrix4f perspective;
     perspective << near / right, 0, 0, 0,
             0, near / top, 0, 0,
-            0, 0, (far + near) / (far - near), -2 * far * near / (far - near),
+            0, 0, (far + near) / (far - near), -2.f * far * near / (far - near),
             0, 0, 1, 0;
 
     return perspective;
@@ -88,20 +88,20 @@ Eigen::Matrix4f TransformMatrix::getScalingMatrix(const Eigen::Vector3f &scaling
 // The value of angle of clockwise rotation is positive
 Eigen::Matrix4f TransformMatrix::getRotationMatrix(const Eigen::Vector4f &axis, float angleDegree) {
     Eigen::Matrix4f rotate;
-    auto radian = (float) (angleDegree / 180 * EIGEN_PI);
+    auto radian = (float) (angleDegree / 180.f * EIGEN_PI);
     float cosTheta = cos(radian);
     float sinTheta = sin(radian);
-    rotate << axis.x() * axis.x() * (1 - cosTheta) + cosTheta,
-            axis.x() * axis.y() * (1 - cosTheta) - axis.z() * sinTheta,
-            axis.x() * axis.z() * (1 - cosTheta) + axis.y() * sinTheta,
+    rotate << axis.x() * axis.x() * (1.f - cosTheta) + cosTheta,
+            axis.x() * axis.y() * (1.f - cosTheta) - axis.z() * sinTheta,
+            axis.x() * axis.z() * (1.f - cosTheta) + axis.y() * sinTheta,
             0,
-            axis.y() * axis.x() * (1 - cosTheta) + axis.z() * sinTheta,
-            axis.y() * axis.y() * (1 - cosTheta) + cosTheta,
-            axis.y() * axis.z() * (1 - cosTheta) - axis.x() * sinTheta,
+            axis.y() * axis.x() * (1.f - cosTheta) + axis.z() * sinTheta,
+            axis.y() * axis.y() * (1.f - cosTheta) + cosTheta,
+            axis.y() * axis.z() * (1.f - cosTheta) - axis.x() * sinTheta,
             0,
-            axis.z() * axis.x() * (1 - cosTheta) - axis.y() * sinTheta,
-            axis.z() * axis.y() * (1 - cosTheta) + axis.x() * sinTheta,
-            axis.z() * axis.z() * (1 - cosTheta) + cosTheta,
+            axis.z() * axis.x() * (1.f - cosTheta) - axis.y() * sinTheta,
+            axis.z() * axis.y() * (1.f - cosTheta) + axis.x() * sinTheta,
+            axis.z() * axis.z() * (1.f - cosTheta) + cosTheta,
             0,
             0, 0, 0, 1;
     return rotate;
