@@ -20,6 +20,7 @@ public:
     std::mutex imageLock;
     cv::Mat image; //(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
     std::atomic<bool> bufferBusy = false;
+    std::deque<std::function<void(void)>> jobs;
     std::thread renderThread;
 };
 
@@ -27,7 +28,7 @@ std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
 
 void drawGUI(GUIContext &guiContext);
 
-void renderAndDrawImage(GUIContext &guiContext, const std::function<void()> &doBeforeRenderThread = []() {});
+void renderAndDrawImage(GUIContext &guiContext);
 
 void guiMouseCallback(int event, int x, int y, int flags, void *userdata);
 
@@ -58,7 +59,7 @@ int main() {
     sceneObject.scalingRatio = {1, 1, 1};
     sceneObject.rotationAxis = {0, 1, 0, 0};
     sceneObject.rotationDegree = 30;
-    sceneObject.modelPos = {0, 1, 0, 1};
+    sceneObject.modelPos = {0, 1.1, 0, 1};
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
 
@@ -201,29 +202,27 @@ void drawGUI(GUIContext &guiContext) {
             exit(0);
         }
         case 'w': {
-            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveForward(0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveForward(0.2); });
             break;
         }
         case 'a': {
-            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveRight(-0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveRight(-0.2); });
             break;
         }
         case 's': {
-            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveForward(-0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveForward(-0.2); });
             break;
         }
         case 'd': {
-            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveRight(0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveRight(0.2); });
             break;
         }
         case 32: {
-            renderAndDrawImage(guiContext,
-                               [&guiContext]() { guiContext.scene.cameraObject->moveUp(0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveUp(0.2); });
             break;
         }
         case 120: {
-            renderAndDrawImage(guiContext,
-                               [&guiContext]() { guiContext.scene.cameraObject->moveUp(-0.5); });
+            guiContext.jobs.emplace_back([&guiContext]() { guiContext.scene.cameraObject->moveUp(-0.2); });
             break;
         }
         default: {
@@ -231,13 +230,14 @@ void drawGUI(GUIContext &guiContext) {
             break;
         }
     }
+    if (!guiContext.jobs.empty()) renderAndDrawImage(guiContext);
 }
 
 void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
     GUIContext &guiContext = *(GUIContext *) userdata;
     static int lastX = -1, lastY = -1;
     switch (event) {
-        case cv::EVENT_RBUTTONDOWN: {
+        case cv::EVENT_LBUTTONDOWN: {
             if (!(x >= 0 && x < guiContext.image.cols && y >= 0 && y < guiContext.image.rows)) break;
             lastX = x, lastY = y;
             break;
@@ -245,9 +245,9 @@ void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
         case cv::EVENT_MOUSEMOVE: {
             if (!(x >= 0 && x < guiContext.image.cols && y >= 0 && y < guiContext.image.rows)) break;
             if (!(lastX >= 0 && lastX < guiContext.image.cols && lastY >= 0 && lastY < guiContext.image.rows)) break;
-            auto deltaX = (float) (x - lastX) / 2, deltaY = (float) (y - lastY) / 2;
+            auto deltaX = (float) (x - lastX) * 0.2f, deltaY = (float) (y - lastY) * 0.2f;
             lastX = x, lastY = y;
-            renderAndDrawImage(guiContext, [&guiContext, &deltaX, &deltaY]() {
+            guiContext.jobs.emplace_back([&guiContext, deltaX, deltaY]() {
                 Eigen::Vector4f topAxis(0, 1, 0, 0);
                 Eigen::Vector4f rightAxis(
                         guiContext.scene.cameraObject->top.cross3(guiContext.scene.cameraObject->toward));
@@ -256,8 +256,9 @@ void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
             });
             break;
         }
-        case cv::EVENT_RBUTTONUP: {
+        case cv::EVENT_LBUTTONUP: {
             lastX = -1, lastY = -1;
+            break;
         }
         default: {
             break;
@@ -266,11 +267,14 @@ void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
     cvui::handleMouse(event, x, y, flags, &cvui::internal::getContext(guiContext.windowName));
 }
 
-void renderAndDrawImage(GUIContext &guiContext, const std::function<void()> &doBeforeRenderThread) {
+void renderAndDrawImage(GUIContext &guiContext) {
     bool expected = false;
     guiContext.bufferBusy.compare_exchange_strong(expected, true);
     if (!expected) {
-        doBeforeRenderThread();
+        for (auto &job: guiContext.jobs) {
+            job();
+        }
+        guiContext.jobs.clear();
         guiContext.renderThread = std::thread([&]() -> void {
             guiContext.scene.draw();
             guiContext.imageLock.lock();

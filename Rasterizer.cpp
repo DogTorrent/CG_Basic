@@ -205,7 +205,7 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
                               + screenSpaceGamma * payload.triangleVertexes[2]->pos.z();
 
     // clip out of range
-    if (pointScreenSpacePos.z() < 0) return;
+    if (pointScreenSpacePos.z() < 0 || pointScreenSpacePos.z() > 1) return;
 
     // z test
     if (pointScreenSpacePos.z() >= screenBuffer.valueInDepthBuffer(pixelX, pixelY))
