@@ -157,9 +157,9 @@ bool Rasterizer::checkInsideTriangle(float posX, float posY, std::array<Primitiv
 
 std::array<float, 3>
 Rasterizer::getBarycentricCoordinates(float x, float y, std::array<Primitive::GPUVertex *, 3> &triangleVertexes) {
-    Eigen::Vector2f AminusB = (triangleVertexes[0]->pos - triangleVertexes[1]->pos).head(2);
-    Eigen::Vector2f BminusC = (triangleVertexes[1]->pos - triangleVertexes[2]->pos).head(2);
-    Eigen::Vector2f CminusA = (triangleVertexes[2]->pos - triangleVertexes[0]->pos).head(2);
+    Eigen::Vector2f AminusB = triangleVertexes[0]->pos.head(2) - triangleVertexes[1]->pos.head(2);
+    Eigen::Vector2f BminusC = triangleVertexes[1]->pos.head(2) - triangleVertexes[2]->pos.head(2);
+    Eigen::Vector2f CminusA = triangleVertexes[2]->pos.head(2) - triangleVertexes[0]->pos.head(2);
     Eigen::Vector2f PminusA = Eigen::Vector2f(x, y) - triangleVertexes[0]->pos.head(2);
     Eigen::Vector2f PminusB = Eigen::Vector2f(x, y) - triangleVertexes[1]->pos.head(2);
     Eigen::Vector2f PminusC = Eigen::Vector2f(x, y) - triangleVertexes[2]->pos.head(2);
@@ -199,6 +199,9 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
             = getBarycentricCoordinates(pointScreenSpacePos.x(), pointScreenSpacePos.y(),
                                         payload.triangleVertexes);
 
+    // ignore point in a 'dot' triangle
+    if (_isnanf(screenSpaceAlpha) || _isnanf(screenSpaceGamma) || _isnanf(screenSpaceBeta)) return;
+
     // interpolate z
     pointScreenSpacePos.z() = screenSpaceAlpha * payload.triangleVertexes[0]->pos.z()
                               + screenSpaceBeta * payload.triangleVertexes[1]->pos.z()
@@ -211,13 +214,16 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
     if (pointScreenSpacePos.z() >= screenBuffer.valueInDepthBuffer(pixelX, pixelY))
         return;
 
-    // z write
-    screenBuffer.valueInDepthBuffer(pixelX, pixelY) = pointScreenSpacePos.z();
-
     // convert barycentric coordinates from screen space to view space
     auto [viewSpaceAlpha, viewSpaceBeta, viewSpaceGamma]
             = convertBarycentricCoordinates(screenSpaceAlpha, screenSpaceBeta, screenSpaceGamma,
                                             payload.triangleVertexes);
+
+    // ignore point in a 'dot' triangle
+    if (_isnanf(viewSpaceAlpha) || _isnanf(viewSpaceGamma) || _isnanf(viewSpaceBeta)) return;
+
+    // z write
+    screenBuffer.valueInDepthBuffer(pixelX, pixelY) = pointScreenSpacePos.z();
 
     // interpolate other
     Eigen::Vector3f color = viewSpaceAlpha * payload.triangleVertexes[0]->color

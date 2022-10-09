@@ -82,8 +82,8 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
         // Viewport transformation
         // ndc_space -> screen_space
         // [-1, 1] => [0, width], [-1, 1] => [0, height], [-1, 1] => [0, MAX_DEPTH]
-        vertex.pos.x() = 0.5f * (float) screenBuffer.width * (vertex.pos.x() + 1.f);
-        vertex.pos.y() = 0.5f * (float) screenBuffer.height * (vertex.pos.y() + 1.f);
+        vertex.pos.x() = 0.5f * (float) (screenBuffer.width - 1) * (vertex.pos.x() + 1.f);
+        vertex.pos.y() = 0.5f * (float) (screenBuffer.height - 1) * (vertex.pos.y() + 1.f);
         vertex.pos.z() = (vertex.pos.z() + 1.f) / 2.f;
     }
 
