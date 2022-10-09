@@ -16,11 +16,11 @@ public:
     Scene scene;
     std::string windowName = "Software Renderer";
     ToolbarComponent toolbarComponent;
-    cv::Mat frame; // = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height + 60), CV_8UC3);
+    cv::Mat frame;
     std::mutex imageLock;
-    cv::Mat image; //(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
+    cv::Mat image;
     std::atomic<bool> bufferBusy = false;
-    std::deque<std::function<void(void)>> jobs;
+    std::deque<std::function<void(void)>> jobs = {[]() {}}; // Add an empty func to render at startup
     std::thread renderThread;
 };
 
