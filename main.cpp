@@ -59,7 +59,7 @@ int main() {
     sceneObject.scalingRatio = {1, 1, 1};
     sceneObject.rotationAxis = {0, 1, 0, 0};
     sceneObject.rotationDegree = 30;
-    sceneObject.modelPos = {0, 1.1, 0, 1};
+    sceneObject.modelPos = {0, 1, 0, 1};
     sceneObject.vertexShader = Shader::emptyVertexShader;
     sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
 
@@ -75,8 +75,10 @@ int main() {
     guiContext.toolbarComponent.padding = 10;
 
     guiContext.frame = cv::Mat(
-            cv::Size(screenBuffer.width + guiContext.toolbarComponent.toolbarWidth, screenBuffer.height + 60), CV_8UC3);
+            cv::Size(screenBuffer.width + guiContext.toolbarComponent.toolbarWidth, screenBuffer.height), CV_8UC3);
     guiContext.image = cv::Mat(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
+    guiContext.image.convertTo(guiContext.image, CV_8UC3, 1.0f);
+    cv::cvtColor(guiContext.image, guiContext.image, cv::COLOR_RGB2BGR);
 
     cvui::init(guiContext.windowName);
     cv::setMouseCallback(guiContext.windowName, guiMouseCallback, &guiContext);
@@ -178,14 +180,12 @@ void drawGUI(GUIContext &guiContext) {
                 cv::destroyAllWindows();
                 exit(0);
             }
+            if (guiContext.bufferBusy) {
+                cvui::text("Rendering...");
+            }
         }
         cvui::endRow();
         cvui::space(0);
-
-        if (guiContext.bufferBusy) {
-            cvui::text("Rendering...");
-            cvui::space(0);
-        }
     }
     cvui::endColumn();
 
