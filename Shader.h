@@ -24,7 +24,9 @@ namespace Shader {
         Primitive::GPUVertex &vertex;
         Eigen::Matrix4f &modelMatrix;
         Eigen::Matrix4f &viewMatrix;
+        Eigen::Matrix4f &modelViewMatrix;
         Eigen::Matrix4f &projectionMatrix;
+        Eigen::Matrix3f &normalMatrix;
     };
 
     void basicVertexShader(const VertexShaderPayload &payload);

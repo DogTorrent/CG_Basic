@@ -116,3 +116,8 @@ Eigen::Matrix4f TransformMatrix::getMovingMatrix(const Eigen::Vector4f &pos) {
     return move;
 }
 
+Eigen::Matrix3f
+TransformMatrix::getNormalMatrix(const Eigen::Matrix4f &modelMatrix, const Eigen::Matrix4f &viewMatrix) {
+    return (viewMatrix * modelMatrix).topLeftCorner<3, 3>().adjoint().transpose();
+}
+

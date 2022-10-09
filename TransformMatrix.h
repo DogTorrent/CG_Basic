@@ -20,6 +20,7 @@ public:
     static Eigen::Matrix4f getScalingMatrix(const Eigen::Vector3f &scalingRatio);
     static Eigen::Matrix4f getRotationMatrix(const Eigen::Vector4f& axis, float angleDegree);
     static Eigen::Matrix4f getMovingMatrix(const Eigen::Vector4f &pos);
+    static Eigen::Matrix3f getNormalMatrix(const Eigen::Matrix4f &modelMatrix, const Eigen::Matrix4f &viewMatrix);
 };
 
 

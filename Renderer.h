@@ -42,6 +42,7 @@ public:
     Eigen::Matrix4f modelMatrix;
     Eigen::Matrix4f viewMatrix;
     Eigen::Matrix4f projectionMatrix;
+    Eigen::Matrix3f normalMatrix;
     std::deque<Primitive::Light> lightList;
     RenderOption renderOption;
 

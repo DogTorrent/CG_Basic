@@ -8,6 +8,7 @@
 #include "Rasterizer.h"
 #include "ScreenBuffer.h"
 #include "Object.h"
+#include "TransformMatrix.h"
 
 Renderer::Renderer(ScreenBuffer &screenBuffer, CameraObject &cameraObject) : screenBuffer(screenBuffer),
                                                                              cameraObject(cameraObject) {};
@@ -17,9 +18,7 @@ void Renderer::transformLights() {
     for (auto &light: lightList) {
         Eigen::Vector4f pos4(light.pos.x(), light.pos.y(), light.pos.z(), 1);
         pos4 = viewMatrix * pos4;
-        light.pos.x() = pos4.x();
-        light.pos.y() = pos4.y();
-        light.pos.z() = pos4.z();
+        light.pos = pos4.head(3);
     }
 }
 
@@ -44,13 +43,19 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
     }
 
     transformLights();
+    normalMatrix = TransformMatrix::getNormalMatrix(modelMatrix, viewMatrix);
+    Eigen::Matrix4f modelViewMatrix = viewMatrix * modelMatrix;
 
     for (auto &vertex: vertexes) {
         // apply mvp transformation
-        Shader::basicVertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
+        Shader::basicVertexShader(
+                Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, modelViewMatrix, projectionMatrix,
+                                            normalMatrix});
 
         // apply vertex shader
-        payload.vertexShader(Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, projectionMatrix});
+        payload.vertexShader(
+                Shader::VertexShaderPayload{vertex, modelMatrix, viewMatrix, modelViewMatrix, projectionMatrix,
+                                            normalMatrix});
     }
 
     std::queue<int> disabledTriangleIndexI;
@@ -77,9 +82,9 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
         // Viewport transformation
         // ndc_space -> screen_space
         // [-1, 1] => [0, width], [-1, 1] => [0, height], [-1, 1] => [0, MAX_DEPTH]
-        vertex.pos.x() = 0.5f * (float) screenBuffer.width * (vertex.pos.x() + 1.0f);
-        vertex.pos.y() = 0.5f * (float) screenBuffer.height * (vertex.pos.y() + 1.0f);
-        vertex.pos.z() = (vertex.pos.z() - cameraObject.nearPaneZ) / (cameraObject.farPaneZ - cameraObject.nearPaneZ);
+        vertex.pos.x() = 0.5f * (float) screenBuffer.width * (vertex.pos.x() + 1.f);
+        vertex.pos.y() = 0.5f * (float) screenBuffer.height * (vertex.pos.y() + 1.f);
+        vertex.pos.z() = (vertex.pos.z() + 1.f) / 2.f;
     }
 
     Rasterizer rasterizer(screenBuffer, material, payload.fragmentShader);
@@ -203,6 +208,7 @@ bool Renderer::cullTriangle(int indexesI) {
     Eigen::Vector3f v2 = vertexes[indexes[indexesI + 2]].viewSpacePos.head(3) * 10 -
                          vertexes[indexes[indexesI]].viewSpacePos.head(3) * 10;
     Eigen::Vector3f normal = v2.cross(v1);
+//    Eigen::Vector3f &normal = vertexes[indexes[indexesI]].normal;
     Eigen::Vector3f toCam = -vertexes[indexes[indexesI]].viewSpacePos.head(3);
     if (renderOption.culling == RenderOption::CULL_BACK) return normal.dot(toCam) >= 0;
     else if (renderOption.culling == RenderOption::CULL_FRONT) return normal.dot(toCam) <= 0;

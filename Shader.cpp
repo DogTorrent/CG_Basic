@@ -6,14 +6,16 @@
 
 namespace Shader {
     void basicVertexShader(const VertexShaderPayload &payload) {
-        Eigen::Matrix4f mv = payload.viewMatrix * payload.modelMatrix;
         // model and view transform
         // model_space -> world_space -> view_space
-        payload.vertex.viewSpacePos = mv * payload.vertex.pos;
+        payload.vertex.viewSpacePos = payload.modelViewMatrix * payload.vertex.pos;
 
         // projection transform
         // view_space -> clip_space
         payload.vertex.pos = payload.projectionMatrix * payload.vertex.viewSpacePos;
+
+        // transform normal to view_space
+        payload.vertex.normal = payload.normalMatrix * payload.vertex.normal.normalized();
     };
 
     void emptyVertexShader(const VertexShaderPayload &payload) {
@@ -38,7 +40,7 @@ namespace Shader {
             kd = payload.material.diffuseTexture.getValue(payload.uv.x(), payload.uv.y()) / 255.f; // Diffuse factor
         float ns = payload.material.ns; // Specular range exponent
 
-        Eigen::Vector3f ambientIntensity(0.005, 0.005, 0.005);
+        Eigen::Vector3f ambientIntensity(0.01, 0.01, 0.01);
 
         Eigen::Vector3f La = Eigen::Vector3f::Zero(), Ld = Eigen::Vector3f::Zero(), Ls = Eigen::Vector3f::Zero();
         for (auto &light: payload.lights) {
