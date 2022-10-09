@@ -238,11 +238,13 @@ void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
     static int lastX = -1, lastY = -1;
     switch (event) {
         case cv::EVENT_RBUTTONDOWN: {
+            if (!(x >= 0 && x < guiContext.image.cols && y >= 0 && y < guiContext.image.rows)) break;
             lastX = x, lastY = y;
             break;
         }
         case cv::EVENT_MOUSEMOVE: {
-            if (lastX == -1 || lastY == -1) break;
+            if (!(x >= 0 && x < guiContext.image.cols && y >= 0 && y < guiContext.image.rows)) break;
+            if (!(lastX >= 0 && lastX < guiContext.image.cols && lastY >= 0 && lastY < guiContext.image.rows)) break;
             auto deltaX = (float) (x - lastX) / 2, deltaY = (float) (y - lastY) / 2;
             lastX = x, lastY = y;
             renderAndDrawImage(guiContext, [&guiContext, &deltaX, &deltaY]() {
@@ -258,10 +260,10 @@ void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
             lastX = -1, lastY = -1;
         }
         default: {
-            cvui::handleMouse(event, x, y, flags, &cvui::internal::getContext(guiContext.windowName));
             break;
         }
     }
+    cvui::handleMouse(event, x, y, flags, &cvui::internal::getContext(guiContext.windowName));
 }
 
 void renderAndDrawImage(GUIContext &guiContext, const std::function<void()> &doBeforeRenderThread) {
