@@ -13,14 +13,19 @@ public:
     int toolbarWidth = 350;
     int padding = 5;
 
-    void f1Row(float &dest1, const std::string &labelName1, bool enabled = true);
-
-    void f2Row(float &dest1, float &dest2,
-               const std::string &labelName1, const std::string &labelName2, bool enabled = true);
-
-    void f3Row(float &dest1, float &dest2, float &dest3,
-               const std::string &labelName1, const std::string &labelName2, const std::string &labelName3,
-               bool enabled = true);
+    template<int size>
+    void fRow(const std::array<float *, size> &dests, const std::array<std::string, size> &names, bool enabled = true) {
+        cvui::beginRow(toolbarWidth, -1, padding);
+        {
+            for (int i = 0; i < size; ++i) {
+                cvui::text(names[i]);
+                auto temp = (double)*dests[i];
+                cvui::counter(&temp, 1, "%.1f");
+                if (enabled) *dests[i] = (float)temp;
+            }
+        }
+        cvui::endRow();
+    }
 
     template<typename T, int size>
     void checkBoxes(T &dest, const std::array<T, size> &candidates,

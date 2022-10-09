@@ -17,7 +17,8 @@ void CameraObject::moveRight(float delta) {
 }
 
 void CameraObject::moveUp(float delta) {
-    pos += top * delta;
+    Eigen::Vector4f topAxis(0,1,0,0);
+    pos += topAxis * delta;
 }
 
 void CameraObject::moveForward(float delta) {

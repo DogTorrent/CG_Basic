@@ -11,23 +11,40 @@
 #include "ToolbarComponent.h"
 #include "Object.h"
 
+class GUIContext {
+public:
+    Scene scene;
+    std::string windowName = "Software Renderer";
+    ToolbarComponent toolbarComponent;
+    cv::Mat frame; // = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height + 60), CV_8UC3);
+    std::mutex imageLock;
+    cv::Mat image; //(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
+    std::atomic<bool> bufferBusy = false;
+    std::thread renderThread;
+};
+
 std::deque<Primitive::Geometry> loadObj(const std::string &pathToObj);
 
+void drawGUI(GUIContext &guiContext);
+
+void renderAndDrawImage(GUIContext &guiContext, const std::function<void()> &doBeforeRenderThread = []() {});
+
+void guiMouseCallback(int event, int x, int y, int flags, void *userdata);
+
 int main() {
-    std::string sceneObjectPath = R"(Resources/Models/Spot/spot_triangulated_mod.obj)";
-    std::string floorObjectPath = R"(Resources/Models/Flat/floor_mod.obj)";
-    Scene scene;
+    GUIContext guiContext;
     ScreenBuffer screenBuffer(700, 700);
     SceneObject sceneObject, floorObject;
     CameraObject cameraObject;
-    scene.screenBuffer = &screenBuffer;
-    scene.pSceneObjectList.push_back(&sceneObject);
-    scene.pSceneObjectList.push_back(&floorObject);
-    scene.cameraObject = &cameraObject;
-    scene.lightList.push_back({{-7, 4,  -4},
-                               {60, 60, 60}});
-    scene.lightList.push_back({{7,  4,  -4},
-                               {60, 60, 60}});
+
+    std::string sceneObjectPath = R"(Resources/Models/Spot/spot_triangulated_mod.obj)";
+    std::string floorObjectPath = R"(Resources/Models/Flat/floor_mod.obj)";
+
+    guiContext.scene.screenBuffer = &screenBuffer;
+    guiContext.scene.pSceneObjectList = {&sceneObject, &floorObject};
+    guiContext.scene.cameraObject = &cameraObject;
+    guiContext.scene.lightList = {{{-7, 4, -4}, {60, 60, 60}},
+                                  {{7,  4, -4}, {60, 60, 60}}};
 
     floorObject.geometryList = loadObj(floorObjectPath);
     floorObject.scalingRatio = {1, 1, 1};
@@ -53,262 +70,216 @@ int main() {
     cameraObject.nearPaneZ = 0.25;
     cameraObject.farPaneZ = 100;
 
+    guiContext.toolbarComponent.toolbarWidth = 400;
+    guiContext.toolbarComponent.padding = 10;
 
-    std::string windowName = "Software Renderer";
-    cvui::init(windowName);
-    int toolbarWidth = 400;
-    int padding = 10;
-    ToolbarComponent toolbarComponent{toolbarWidth, padding};
-    cv::Mat frame = cv::Mat(cv::Size(screenBuffer.width + toolbarWidth, screenBuffer.height + 60), CV_8UC3);
-    cv::Mat image(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
+    guiContext.frame = cv::Mat(
+            cv::Size(screenBuffer.width + guiContext.toolbarComponent.toolbarWidth, screenBuffer.height + 60), CV_8UC3);
+    guiContext.image = cv::Mat(screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data());
 
-    std::atomic<bool> isRendering(false);
-    std::thread renderThread;
-    while (cv::getWindowProperty(windowName, cv::WINDOW_AUTOSIZE) >= 0) {
-        frame = cv::Scalar(49, 52, 49);
+    cvui::init(guiContext.windowName);
+    cv::setMouseCallback(guiContext.windowName, guiMouseCallback, &guiContext);
+    while (cv::getWindowProperty(guiContext.windowName, cv::WINDOW_AUTOSIZE) >= 0) {
+        drawGUI(guiContext);
+    }
+}
 
-        cvui::beginColumn(frame, screenBuffer.width + padding, 0, toolbarWidth - 2 * padding, -1, padding);
+void drawGUI(GUIContext &guiContext) {
+    int toolbarWidth = guiContext.toolbarComponent.toolbarWidth;
+    int padding = guiContext.toolbarComponent.padding;
+    guiContext.frame = cv::Scalar(49, 52, 49);
+
+    cvui::beginColumn(guiContext.frame, guiContext.scene.screenBuffer->width + padding, 0,
+                      toolbarWidth - 2 * padding, -1, padding);
+    {
+        cvui::space(0);
+
+        for (int i = 0; i < guiContext.scene.pSceneObjectList.size(); ++i) {
+            std::string objName = "Object " + std::to_string(i);
+
+            cvui::text(objName + " Position");
+            guiContext.toolbarComponent.fRow<3>({&guiContext.scene.pSceneObjectList[i]->modelPos.x(),
+                                                 &guiContext.scene.pSceneObjectList[i]->modelPos.y(),
+                                                 &guiContext.scene.pSceneObjectList[i]->modelPos.z()},
+                                                {"x:", "y:", "z:"}, !guiContext.bufferBusy);
+            cvui::space(0);
+
+            cvui::text(objName + " Fragment Shader");
+            guiContext.toolbarComponent.checkBoxes < void(*)(const Shader::FragmentShaderPayload &), 3 > (
+                    *guiContext.scene.pSceneObjectList[i]->fragmentShader.target < void(*)(
+            const Shader::FragmentShaderPayload &) > (),
+                    {Shader::blinnPhongFragmentShader,
+                     Shader::textureFragmentShader,
+                     Shader::emptyFragmentShader},
+                    {"Blinn-Phong", "Texture", "Empty"},
+                    !guiContext.bufferBusy);
+            cvui::space(0);
+
+
+            cvui::text(objName + " Render Mode");
+            guiContext.toolbarComponent.checkBoxes<RenderOption::RenderMode, 2>(
+                    guiContext.scene.pSceneObjectList[i]->renderOption.renderMode,
+                    {RenderOption::MODE_DEFAULT,
+                     RenderOption::MODE_LINE_ONLY},
+                    {"MODE_DEFAULT", "MODE_LINE_ONLY"},
+                    !guiContext.bufferBusy);
+            cvui::space(0);
+
+            cvui::text(objName + " Culling Mode");
+            guiContext.toolbarComponent.checkBoxes<RenderOption::Culling, 3>(
+                    guiContext.scene.pSceneObjectList[i]->renderOption.culling,
+                    {RenderOption::CULL_BACK,
+                     RenderOption::CULL_FRONT,
+                     RenderOption::CULL_NONE},
+                    {"CULL_BACK", "CULL_FRONT", "CULL_NONE"},
+                    !guiContext.bufferBusy);
+            cvui::space(0);
+        }
+
+        cvui::text("Camera Position");
+        guiContext.toolbarComponent.fRow<3>(
+                {&guiContext.scene.cameraObject->pos.x(),
+                 &guiContext.scene.cameraObject->pos.y(),
+                 &guiContext.scene.cameraObject->pos.z()},
+                {"x:", "y:", "z:"}, !guiContext.bufferBusy);
+        cvui::space(0);
+
+        for (int i = 0; i < guiContext.scene.lightList.size(); ++i) {
+            cvui::text("Light " + std::to_string(i) + " Position");
+            guiContext.toolbarComponent.fRow<3>(
+                    {&guiContext.scene.lightList[i].pos.x(),
+                     &guiContext.scene.lightList[i].pos.y(),
+                     &guiContext.scene.lightList[i].pos.z()},
+                    {"x:", "y:", "z:"}, !guiContext.bufferBusy);
+            cvui::space(0);
+        }
+
+        cvui::beginRow(toolbarWidth, -1, padding);
         {
-            cvui::space(0);
-
-            cvui::text("Object Position");
-            toolbarComponent.f3Row(sceneObject.modelPos.x(),
-                                   sceneObject.modelPos.y(),
-                                   sceneObject.modelPos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Object Fragment Shader");
-            cvui::beginRow(toolbarWidth, -1, padding);
-            {
-                auto
-                pFragmentShader = sceneObject.fragmentShader.target < void(*)
-                (const Shader::FragmentShaderPayload &) > ();
-
-                bool enableBlinnPhong = *pFragmentShader == Shader::blinnPhongFragmentShader;
-                enableBlinnPhong = cvui::checkbox("Blinn-Phong", &enableBlinnPhong);
-                if (!isRendering && enableBlinnPhong) {
-                    sceneObject.fragmentShader = Shader::blinnPhongFragmentShader;
-                }
-
-                bool enableTexture = *pFragmentShader == Shader::textureFragmentShader;
-                enableTexture = cvui::checkbox("Texture", &enableTexture);
-                if (!isRendering && enableTexture) {
-                    sceneObject.fragmentShader = Shader::textureFragmentShader;
-                }
-
-                if (!isRendering && !enableBlinnPhong && !enableTexture) {
-                    sceneObject.fragmentShader = Shader::emptyFragmentShader;
+            if (cvui::button("Render")) {
+                renderAndDrawImage(guiContext);
+            }
+            if (cvui::button("Clean")) {
+                bool expected = false;
+                guiContext.bufferBusy.compare_exchange_strong(expected, true);
+                if (!expected) {
+                    guiContext.scene.screenBuffer->clearBuffer();
+                    guiContext.imageLock.lock();
+                    guiContext.image = {guiContext.scene.screenBuffer->width, guiContext.scene.screenBuffer->height,
+                                        CV_32FC3, guiContext.scene.screenBuffer->frameBuffer.data()};
+                    guiContext.image.convertTo(guiContext.image, CV_8UC3, 1.0f);
+                    cv::cvtColor(guiContext.image, guiContext.image, cv::COLOR_RGB2BGR);
+                    guiContext.imageLock.unlock();
+                    guiContext.bufferBusy = false;
                 }
             }
-            cvui::endRow();
-            cvui::space(0);
-
-            cvui::text("Object Render Mode");
-            toolbarComponent.checkBoxes<RenderOption::RenderMode, 2>(sceneObject.renderOption.renderMode,
-                                                                     {RenderOption::MODE_DEFAULT,
-                                                                      RenderOption::MODE_LINE_ONLY},
-                                                                     {"MODE_DEFAULT", "MODE_LINE_ONLY"},
-                                                                     !isRendering);
-            cvui::space(0);
-
-            cvui::text("Object Culling Mode");
-            toolbarComponent.checkBoxes<RenderOption::Culling, 3>(sceneObject.renderOption.culling,
-                                                                  {RenderOption::CULL_BACK,
-                                                                   RenderOption::CULL_FRONT,
-                                                                   RenderOption::CULL_NONE},
-                                                                  {"CULL_BACK", "CULL_FRONT", "CULL_NONE"},
-                                                                  !isRendering);
-            cvui::space(0);
-
-            cvui::text("Floor Position");
-            toolbarComponent.f3Row(floorObject.modelPos.x(),
-                                   floorObject.modelPos.y(),
-                                   floorObject.modelPos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Floor Fragment Shader");
-            cvui::beginRow(toolbarWidth, -1, padding);
-            {
-                auto
-                pFragmentShader = floorObject.fragmentShader.target < void(*)
-                (const Shader::FragmentShaderPayload &) > ();
-
-                bool enableBlinnPhong = *pFragmentShader == Shader::blinnPhongFragmentShader;
-                enableBlinnPhong = cvui::checkbox("Blinn-Phong", &enableBlinnPhong);
-                if (!isRendering && enableBlinnPhong) {
-                    floorObject.fragmentShader = Shader::blinnPhongFragmentShader;
-                }
-
-                bool enableTexture = *pFragmentShader == Shader::textureFragmentShader;
-                enableTexture = cvui::checkbox("Texture", &enableTexture);
-                if (!isRendering && enableTexture) {
-                    floorObject.fragmentShader = Shader::textureFragmentShader;
-                }
-
-                if (!isRendering && !enableBlinnPhong && !enableTexture) {
-                    floorObject.fragmentShader = Shader::emptyFragmentShader;
-                }
-            }
-            cvui::endRow();
-            cvui::space(0);
-
-            cvui::text("Floor Render Mode");
-            toolbarComponent.checkBoxes<RenderOption::RenderMode, 2>(floorObject.renderOption.renderMode,
-                                                                     {RenderOption::MODE_DEFAULT,
-                                                                      RenderOption::MODE_LINE_ONLY},
-                                                                     {"MODE_DEFAULT", "MODE_LINE_ONLY"},
-                                                                     !isRendering);
-            cvui::space(0);
-
-            cvui::text("Floor Culling Mode");
-            toolbarComponent.checkBoxes<RenderOption::Culling, 3>(floorObject.renderOption.culling,
-                                                                  {RenderOption::CULL_BACK,
-                                                                   RenderOption::CULL_FRONT,
-                                                                   RenderOption::CULL_NONE},
-                                                                  {"CULL_BACK", "CULL_FRONT", "CULL_NONE"},
-                                                                  !isRendering);
-            cvui::space(0);
-
-            cvui::text("Camera Position");
-            toolbarComponent.f3Row(cameraObject.pos.x(),
-                                   cameraObject.pos.y(),
-                                   cameraObject.pos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Light 0 Position");
-            toolbarComponent.f3Row(scene.lightList[0].pos.x(),
-                                   scene.lightList[0].pos.y(),
-                                   scene.lightList[0].pos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::text("Light 1 Position");
-            toolbarComponent.f3Row(scene.lightList[1].pos.x(),
-                                   scene.lightList[1].pos.y(),
-                                   scene.lightList[1].pos.z(),
-                                   "x:", "y:", "z:", !isRendering);
-            cvui::space(0);
-
-            cvui::beginRow(toolbarWidth, -1, padding);
-            {
-                if (cvui::button("Render")) {
-                    bool expected = false;
-                    isRendering.compare_exchange_strong(expected, true);
-                    if (!expected) {
-                        renderThread = std::thread([&]() -> void {
-                            scene.draw();
-                            isRendering = false;
-                        });
-                        renderThread.detach();
-                    }
-                }
-                if (cvui::button("Clean")) {
-                    if (!isRendering) {
-                        screenBuffer.clearBuffer();
-                    }
-                }
-                if (cvui::button("Reload .obj File")) {
-                    if (!isRendering) {
-                        sceneObject.geometryList = loadObj(sceneObjectPath);
-                    }
-                }
-                if (cvui::button("Exit")) {
-                    cv::destroyAllWindows();
-                    exit(0);
-                }
-            }
-            cvui::endRow();
-            cvui::space(0);
-
-            if (isRendering) {
-                cvui::text("Rendering...");
-                cvui::space(0);
+            if (cvui::button("Exit")) {
+                cv::destroyAllWindows();
+                exit(0);
             }
         }
-        cvui::endColumn();
+        cvui::endRow();
+        cvui::space(0);
 
-        if (!isRendering) {
+        if (guiContext.bufferBusy) {
+            cvui::text("Rendering...");
+            cvui::space(0);
         }
-        image = {screenBuffer.width, screenBuffer.height, CV_32FC3, screenBuffer.frameBuffer.data()};
-        image.convertTo(image, CV_8UC3, 1.0f);
-        cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-        cvui::image(frame, 0, 0, image);
+    }
+    cvui::endColumn();
 
-        cvui::imshow(windowName, frame);
+    guiContext.imageLock.lock();
+    cvui::image(guiContext.frame, 0, 0, guiContext.image);
+    guiContext.imageLock.unlock();
 
-        int key = cv::waitKeyEx(20);
-        if (key == 27) {
+    cvui::imshow(guiContext.windowName, guiContext.frame);
+
+    int key = cv::waitKeyEx(20);
+    switch (key) {
+        case 27: {
+            cv::destroyAllWindows();
+            exit(0);
+        }
+        case 'w': {
+            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveForward(0.5); });
             break;
-        } else if (key == 'a') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.moveRight(-0.5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
-        } else if (key == 'd') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.moveRight(0.5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
-        } else if (key == 'w') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.moveForward(0.5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
-        } else if (key == 's') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.moveForward(-0.5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
-        } else if (key == 'q') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.rotate(cameraObject.top, -5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
-        } else if (key == 'e') {
-            bool expected = false;
-            isRendering.compare_exchange_strong(expected, true);
-            if (!expected) {
-                cameraObject.rotate(cameraObject.top, 5);
-                renderThread = std::thread([&]() -> void {
-                    scene.draw();
-                    isRendering = false;
-                });
-                renderThread.detach();
-            }
         }
+        case 'a': {
+            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveRight(-0.5); });
+            break;
+        }
+        case 's': {
+            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveForward(-0.5); });
+            break;
+        }
+        case 'd': {
+            renderAndDrawImage(guiContext, [&guiContext]() { guiContext.scene.cameraObject->moveRight(0.5); });
+            break;
+        }
+        case 32: {
+            renderAndDrawImage(guiContext,
+                               [&guiContext]() { guiContext.scene.cameraObject->moveUp(0.5); });
+            break;
+        }
+        case 120: {
+            renderAndDrawImage(guiContext,
+                               [&guiContext]() { guiContext.scene.cameraObject->moveUp(-0.5); });
+            break;
+        }
+        default: {
+            if (key != -1) std::cout << key << std::endl;
+            break;
+        }
+    }
+}
+
+void guiMouseCallback(int event, int x, int y, int flags, void *userdata) {
+    GUIContext &guiContext = *(GUIContext *) userdata;
+    static int lastX = -1, lastY = -1;
+    switch (event) {
+        case cv::EVENT_RBUTTONDOWN: {
+            lastX = x, lastY = y;
+            break;
+        }
+        case cv::EVENT_MOUSEMOVE: {
+            if (lastX == -1 || lastY == -1) break;
+            auto deltaX = (float) (x - lastX) / 2, deltaY = (float) (y - lastY) / 2;
+            lastX = x, lastY = y;
+            renderAndDrawImage(guiContext, [&guiContext, &deltaX, &deltaY]() {
+                Eigen::Vector4f topAxis(0, 1, 0, 0);
+                Eigen::Vector4f rightAxis(
+                        guiContext.scene.cameraObject->top.cross3(guiContext.scene.cameraObject->toward));
+                guiContext.scene.cameraObject->rotate(rightAxis, deltaY);
+                guiContext.scene.cameraObject->rotate(topAxis, deltaX);
+            });
+            break;
+        }
+        case cv::EVENT_RBUTTONUP: {
+            lastX = -1, lastY = -1;
+        }
+        default: {
+            cvui::handleMouse(event, x, y, flags, &cvui::internal::getContext(guiContext.windowName));
+            break;
+        }
+    }
+}
+
+void renderAndDrawImage(GUIContext &guiContext, const std::function<void()> &doBeforeRenderThread) {
+    bool expected = false;
+    guiContext.bufferBusy.compare_exchange_strong(expected, true);
+    if (!expected) {
+        doBeforeRenderThread();
+        guiContext.renderThread = std::thread([&]() -> void {
+            guiContext.scene.draw();
+            guiContext.imageLock.lock();
+            guiContext.image = {guiContext.scene.screenBuffer->width, guiContext.scene.screenBuffer->height,
+                                CV_32FC3, guiContext.scene.screenBuffer->frameBuffer.data()};
+            guiContext.image.convertTo(guiContext.image, CV_8UC3, 1.0f);
+            cv::cvtColor(guiContext.image, guiContext.image, cv::COLOR_RGB2BGR);
+            guiContext.imageLock.unlock();
+            guiContext.bufferBusy = false;
+        });
+        guiContext.renderThread.detach();
     }
 }
 
