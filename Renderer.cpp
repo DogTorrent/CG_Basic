@@ -77,7 +77,7 @@ void Renderer::renderGeometry(const RendererPayload &payload) {
 
         // Homogeneous division
         // clip_space -> ndc_space
-        vertex.pos /= vertex.pos.w();
+        vertex.pos.head(3) /= vertex.pos.w();
 
         // Viewport transformation
         // ndc_space -> screen_space

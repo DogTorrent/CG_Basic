@@ -199,15 +199,10 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
             = getBarycentricCoordinates(pointScreenSpacePos.x(), pointScreenSpacePos.y(),
                                         payload.triangleVertexes);
 
-    // convert barycentric coordinates from screen space to view space
-    auto [viewSpaceAlpha, viewSpaceBeta, viewSpaceGamma]
-            = convertBarycentricCoordinates(screenSpaceAlpha, screenSpaceBeta, screenSpaceGamma,
-                                            payload.triangleVertexes);
-
     // interpolate z
-    pointScreenSpacePos.z() = viewSpaceAlpha * payload.triangleVertexes[0]->pos.z()
-                              + viewSpaceBeta * payload.triangleVertexes[1]->pos.z()
-                              + viewSpaceGamma * payload.triangleVertexes[2]->pos.z();
+    pointScreenSpacePos.z() = screenSpaceAlpha * payload.triangleVertexes[0]->pos.z()
+                              + screenSpaceBeta * payload.triangleVertexes[1]->pos.z()
+                              + screenSpaceGamma * payload.triangleVertexes[2]->pos.z();
 
     // clip out of range
     if (pointScreenSpacePos.z() < 0) return;
@@ -218,6 +213,11 @@ void Rasterizer::drawScreenSpacePoint(Eigen::Vector3f &pointScreenSpacePos, cons
 
     // z write
     screenBuffer.valueInDepthBuffer(pixelX, pixelY) = pointScreenSpacePos.z();
+
+    // convert barycentric coordinates from screen space to view space
+    auto [viewSpaceAlpha, viewSpaceBeta, viewSpaceGamma]
+            = convertBarycentricCoordinates(screenSpaceAlpha, screenSpaceBeta, screenSpaceGamma,
+                                            payload.triangleVertexes);
 
     // interpolate other
     Eigen::Vector3f color = viewSpaceAlpha * payload.triangleVertexes[0]->color
